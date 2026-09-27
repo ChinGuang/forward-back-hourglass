@@ -17,6 +17,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        _viewModel.SaveState();
         _viewModel.Dispose();
         base.OnClosing(e);
     }

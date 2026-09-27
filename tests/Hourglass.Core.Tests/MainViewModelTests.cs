@@ -133,7 +133,8 @@ public class MainViewModelTests
         vm.ForwardSpeed = 2;
         vm.BackwardSpeed = 8;
 
-        Assert.Equal(new HourglassSettings(2, 8), _settings.Current);
+        Assert.Equal(2, _settings.Current.ForwardSpeed);
+        Assert.Equal(8, _settings.Current.BackwardSpeed);
     }
 
     [Fact]
@@ -288,6 +289,124 @@ public class MainViewModelTests
 
         Assert.False(_ticker.IsRunning);
         Assert.False(_alarm.IsPlaying);
+    }
+
+    [Fact]
+    public void SaveState_StoresSpeedsAndTimer()
+    {
+        var vm = CreateViewModel();
+        vm.ForwardSpeed = 2;
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(5); // 10 s at 2x
+
+        vm.SaveState();
+
+        Assert.Equal(2, _settings.Current.ForwardSpeed);
+        Assert.Equal(
+            new TimerSnapshot(TimeSpan.FromSeconds(10), TimerState.Forward, TimerDirection.Forward, TimeSpan.Zero),
+            _settings.Current.Timer);
+    }
+
+    [Fact]
+    public void ChangingSpeed_AlsoSavesTheCurrentTimer()
+    {
+        var vm = CreateViewModel();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(3);
+
+        vm.BackwardSpeed = 4;
+
+        Assert.Equal(TimeSpan.FromSeconds(3), _settings.Current.Timer?.Value);
+    }
+
+    [Fact]
+    public void Reopening_RunningTimer_ResumesTickingFromSavedValue()
+    {
+        var saved = new HourglassSettings(1, 1,
+            new TimerSnapshot(TimeSpan.FromSeconds(42), TimerState.Forward, TimerDirection.Forward, TimeSpan.Zero));
+
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+
+        Assert.True(_ticker.IsRunning);
+        Assert.Equal("00:00:42.0", vm.DisplayTime);
+        Assert.Equal("Counting forward", vm.StatusText);
+        Assert.False(vm.StartCommand.CanExecute(null));
+        Assert.True(vm.PauseCommand.CanExecute(null));
+
+        _ticker.Elapse(1);
+        Assert.Equal("00:00:43.0", vm.DisplayTime);
+    }
+
+    [Fact]
+    public void Reopening_RunningCountdown_ResumesAndRingsAtZero()
+    {
+        var saved = new HourglassSettings(1, 2,
+            new TimerSnapshot(TimeSpan.FromSeconds(4), TimerState.Backward, TimerDirection.Backward, TimeSpan.FromSeconds(8)));
+
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+
+        Assert.Equal(0.5, vm.UpperSand, precision: 6);
+        _ticker.Elapse(2); // 4 s at 2x
+
+        Assert.True(vm.IsRinging);
+        Assert.True(_alarm.IsPlaying);
+    }
+
+    [Fact]
+    public void Reopening_PausedTimer_StaysPaused()
+    {
+        var saved = new HourglassSettings(1, 1,
+            new TimerSnapshot(TimeSpan.FromSeconds(7), TimerState.Paused, TimerDirection.Forward, TimeSpan.Zero));
+
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+
+        Assert.False(_ticker.IsRunning);
+        Assert.Equal("Paused", vm.StatusText);
+        Assert.Equal("00:00:07.0", vm.DisplayTime);
+
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(1);
+        Assert.Equal("00:00:08.0", vm.DisplayTime);
+    }
+
+    [Fact]
+    public void Reopening_AfterCountdownFinished_IsSilentAndResettable()
+    {
+        var saved = new HourglassSettings(1, 1,
+            new TimerSnapshot(TimeSpan.Zero, TimerState.Idle, TimerDirection.Backward, TimeSpan.FromSeconds(8)));
+
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+
+        Assert.False(_alarm.IsPlaying);
+        Assert.False(vm.IsRinging);
+        Assert.Equal("Ready", vm.StatusText);
+        Assert.Equal(1, vm.LowerSand, precision: 6);
+        Assert.True(vm.ResetCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Reopening_WithInvalidSavedTimer_StartsFresh_ButKeepsSpeeds()
+    {
+        var saved = new HourglassSettings(4, 0.5,
+            new TimerSnapshot(TimeSpan.FromSeconds(-5), TimerState.Forward, TimerDirection.Forward, TimeSpan.Zero));
+
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+
+        Assert.Equal("00:00:00.0", vm.DisplayTime);
+        Assert.Equal("Ready", vm.StatusText);
+        Assert.False(_ticker.IsRunning);
+        Assert.Equal(4, vm.ForwardSpeed);
+        Assert.Equal(0.5, vm.BackwardSpeed);
+    }
+
+    [Fact]
+    public void Reopening_WithNoSavedTimer_StartsFresh()
+    {
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(new HourglassSettings(2, 2)));
+
+        Assert.Equal("00:00:00.0", vm.DisplayTime);
+        Assert.Equal("Ready", vm.StatusText);
+        Assert.False(_ticker.IsRunning);
     }
 
     private MainViewModel RingingViewModel()

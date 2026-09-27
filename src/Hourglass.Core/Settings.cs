@@ -2,7 +2,11 @@ using System.Text.Json;
 
 namespace Hourglass.Core;
 
-public sealed record HourglassSettings(double ForwardSpeed = SpeedPresets.Default, double BackwardSpeed = SpeedPresets.Default);
+/// <param name="Timer">The timer as it was when the app closed; null (e.g. in files from older versions) means a fresh timer.</param>
+public sealed record HourglassSettings(
+    double ForwardSpeed = SpeedPresets.Default,
+    double BackwardSpeed = SpeedPresets.Default,
+    TimerSnapshot? Timer = null);
 
 public interface ISettingsStore
 {
@@ -58,7 +62,7 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Remembering speeds is a convenience; never crash the timer over it.
+            // Remembering speeds and the timer is a convenience; never crash the app over it.
         }
     }
 }

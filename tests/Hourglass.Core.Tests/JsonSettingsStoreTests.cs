@@ -74,6 +74,30 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveThenLoad_RoundTripsTheTimer()
+    {
+        var store = new JsonSettingsStore(SettingsPath);
+        var timer = new TimerSnapshot(
+            TimeSpan.FromSeconds(12.345), TimerState.Backward, TimerDirection.Backward, TimeSpan.FromMinutes(3));
+
+        store.Save(new HourglassSettings(2, 4, timer));
+
+        Assert.Equal(new HourglassSettings(2, 4, timer), new JsonSettingsStore(SettingsPath).Load());
+    }
+
+    [Fact]
+    public void Load_FileFromPreviousVersion_HasNoTimer_ButKeepsSpeeds()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath, """{ "ForwardSpeed": 2, "BackwardSpeed": 0.5 }""");
+
+        var loaded = new JsonSettingsStore(SettingsPath).Load();
+
+        Assert.Equal(new HourglassSettings(2, 0.5), loaded);
+        Assert.Null(loaded.Timer);
+    }
+
+    [Fact]
     public void DefaultPath_IsUnderAppDataFolder()
     {
         Assert.EndsWith(Path.Combine("ForwardBackHourglass", "settings.json"), JsonSettingsStore.DefaultPath);

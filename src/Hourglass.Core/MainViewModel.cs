@@ -30,6 +30,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         // Snap to presets here so any store (or a hand-edited file) can't put an invalid speed in the timer.
         _timer.ForwardSpeed = SpeedPresets.Normalize(saved.ForwardSpeed);
         _timer.BackwardSpeed = SpeedPresets.Normalize(saved.BackwardSpeed);
+        if (saved.Timer is not null)
+        {
+            // An invalid saved timer is dropped (the timer starts fresh) without losing the speeds.
+            _timer.Restore(saved.Timer);
+        }
 
         StartCommand = new RelayCommand(() => Apply(() => _timer.Start()), () => _timer.CanStart);
         BackwardCommand = new RelayCommand(() => Apply(() => _timer.Backward()), () => _timer.CanGoBackward);
@@ -41,6 +46,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ticker.Tick += OnTick;
         _lastCanExecute = CurrentCanExecute();
         _shown = TakeSnapshot();
+
+        // A timer that was running when the app closed carries on from where it was.
+        Sync();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -86,6 +94,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsSandFlowing => _shown.Sand.IsFlowing;
 
+    /// <summary>Saves the speeds and the timer's current position. Called when the app closes.</summary>
+    public void SaveState() => _settings.Save(CurrentSettings());
+
     public void Dispose()
     {
         _ticker.Tick -= OnTick;
@@ -122,7 +133,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _timer.BackwardSpeed = speed;
         }
 
-        _settings.Save(new HourglassSettings(_timer.ForwardSpeed, _timer.BackwardSpeed));
+        _settings.Save(CurrentSettings());
         OnPropertyChanged(forward ? nameof(ForwardSpeed) : nameof(BackwardSpeed));
     }
 
@@ -180,6 +191,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         _lastCanExecute = canExecute;
     }
+
+    private HourglassSettings CurrentSettings() =>
+        new(_timer.ForwardSpeed, _timer.BackwardSpeed, _timer.ToSnapshot());
 
     private Snapshot TakeSnapshot() => new(
         TimeFormatter.Format(_timer.Value, roundUp: _timer.LastDirection == TimerDirection.Backward),
