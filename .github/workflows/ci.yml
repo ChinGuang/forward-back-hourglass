@@ -68,3 +68,5 @@ jobs:
         with:
           files: ForwardBackHourglass.exe
           generate_release_notes: true
+          # Tags like v1.0.0-preview.1 publish as pre-releases; plain v1.0.0 is a normal release.
+          prerelease: ${{ contains(github.ref_name, '-') }}

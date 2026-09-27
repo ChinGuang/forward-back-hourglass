@@ -22,8 +22,21 @@ Speeds are saved in `%APPDATA%\ForwardBackHourglass\settings.json`.
 
 ## Download
 
-1. Open the repository's **Actions** tab, pick the latest successful **CI** run, and download the **ForwardBackHourglass-win-x64** artifact. When a `v*` tag is pushed, the same file is also attached to a GitHub **Release**.
-2. Unzip it and double-click `ForwardBackHourglass.exe`. The file is unsigned, so Windows SmartScreen may warn on first launch. Choose **More info → Run anyway**.
+1. Go to the repository's [**Releases**](https://github.com/ChinGuang/forward-back-hourglass/releases) page and download `ForwardBackHourglass.exe` from the latest release. There's nothing to unzip or install.
+2. Double-click it. The file is unsigned, so Windows SmartScreen may warn on first launch. Choose **More info → Run anyway**.
+
+Every CI run also uploads the same `.exe` as the **ForwardBackHourglass-win-x64** artifact in the **Actions** tab, which is handy for testing a branch before it's released.
+
+### Publishing a release
+
+Push a tag that starts with `v` and CI builds the `.exe` and attaches it to a GitHub Release:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+A tag containing a `-` (for example `v1.1.0-preview.1`) is published as a pre-release.
 
 Requires Windows 10 or 11 (x64).
 
