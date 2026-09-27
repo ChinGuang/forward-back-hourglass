@@ -188,7 +188,9 @@ public sealed class HourglassTimer
         {
             TimerState.Forward => s.LastDirection == TimerDirection.Forward,
             TimerState.Backward => s.LastDirection == TimerDirection.Backward && s.Value > TimeSpan.Zero,
-            TimerState.Paused => s.LastDirection != TimerDirection.None,
+            // A countdown that reaches zero goes Idle, so a paused one always has time left.
+            TimerState.Paused => s.LastDirection == TimerDirection.Forward
+                || (s.LastDirection == TimerDirection.Backward && s.Value > TimeSpan.Zero),
             // Idle only happens fresh (after Reset) or drained to zero by a countdown.
             _ => s.Value == TimeSpan.Zero && s.LastDirection != TimerDirection.Forward,
         };

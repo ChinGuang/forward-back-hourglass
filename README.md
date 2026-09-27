@@ -24,7 +24,7 @@ The hourglass animation turns over when you change direction:
 - A paused timer stays paused.
 - A countdown that had already finished reopens drained and silent. Press Reset to refill the glass.
 
-The timer and the speeds are saved in `%APPDATA%\ForwardBackHourglass\settings.json` when the window closes, and also when Windows shuts down or logs off.
+The timer and the speeds are saved in `%APPDATA%\ForwardBackHourglass\settings.json` when the window closes, and also when Windows shuts down or logs off. If the app crashes or is ended from Task Manager, it reopens with a fresh timer. Your speeds are kept.
 
 ## Download
 

@@ -98,6 +98,52 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_WritesStatesByName()
+    {
+        var store = new JsonSettingsStore(SettingsPath);
+
+        store.Save(new HourglassSettings(1, 1,
+            new TimerSnapshot(TimeSpan.FromSeconds(3), TimerState.Paused, TimerDirection.Backward, TimeSpan.FromSeconds(9))));
+
+        string json = File.ReadAllText(SettingsPath);
+        Assert.Contains("\"Paused\"", json);
+        Assert.Contains("\"Backward\"", json);
+    }
+
+    [Theory]
+    [InlineData("""{ "Value": "not a time", "State": "Paused", "LastDirection": "Forward", "BackwardPeak": "00:00:00" }""")]
+    [InlineData("""{ "Value": "00:00:05", "State": "Sideways", "LastDirection": "Forward", "BackwardPeak": "00:00:00" }""")]
+    [InlineData("\"just a string\"")]
+    public void Load_UnreadableTimer_IsDropped_ButSpeedsAreKept(string timerJson)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath, $$"""{ "ForwardSpeed": 4, "BackwardSpeed": 0.5, "Timer": {{timerJson}} }""");
+
+        Assert.Equal(new HourglassSettings(4, 0.5), new JsonSettingsStore(SettingsPath).Load());
+    }
+
+    [Fact]
+    public void Load_NumericStates_AreStillAccepted()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath,
+            """{ "ForwardSpeed": 1, "BackwardSpeed": 1, "Timer": { "Value": "00:00:05", "State": 3, "LastDirection": 1, "BackwardPeak": "00:00:00" } }""");
+
+        Assert.Equal(
+            new TimerSnapshot(TimeSpan.FromSeconds(5), TimerState.Paused, TimerDirection.Forward, TimeSpan.Zero),
+            new JsonSettingsStore(SettingsPath).Load().Timer);
+    }
+
+    [Fact]
+    public void Load_NonObjectFile_ReturnsDefaults()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath, "[1, 2, 3]");
+
+        Assert.Equal(new HourglassSettings(), new JsonSettingsStore(SettingsPath).Load());
+    }
+
+    [Fact]
     public void DefaultPath_IsUnderAppDataFolder()
     {
         Assert.EndsWith(Path.Combine("ForwardBackHourglass", "settings.json"), JsonSettingsStore.DefaultPath);

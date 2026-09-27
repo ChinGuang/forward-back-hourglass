@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Hourglass.Core;
 
@@ -17,11 +18,16 @@ public interface ISettingsStore
 
 /// <summary>
 /// Stores settings as JSON. A missing or unreadable file falls back to defaults instead of failing startup.
-/// Values are returned as stored; the view model snaps them to valid presets.
+/// Values are returned as stored; the view model snaps speeds to presets and validates the timer.
 /// </summary>
 public sealed class JsonSettingsStore(string filePath) : ISettingsStore
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    // States are written by name ("Backward"), so the file stays readable and doesn't depend on enum order.
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     /// <summary><c>%APPDATA%\ForwardBackHourglass\settings.json</c> on Windows.</summary>
     public static string DefaultPath { get; } = Path.Combine(
@@ -40,7 +46,8 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
                 return new HourglassSettings();
             }
 
-            return JsonSerializer.Deserialize<HourglassSettings>(File.ReadAllText(FilePath), Options) ?? new HourglassSettings();
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(FilePath));
+            return Parse(document.RootElement);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -65,4 +72,36 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
             // Remembering speeds and the timer is a convenience; never crash the app over it.
         }
     }
+
+    /// <summary>Reads each part on its own, so a damaged timer section can't cost the user their speeds.</summary>
+    private static HourglassSettings Parse(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return new HourglassSettings();
+        }
+
+        TimerSnapshot? timer = null;
+        if (root.TryGetProperty(nameof(HourglassSettings.Timer), out JsonElement timerJson) && timerJson.ValueKind == JsonValueKind.Object)
+        {
+            try
+            {
+                timer = timerJson.Deserialize<TimerSnapshot>(Options);
+            }
+            catch (JsonException)
+            {
+                // Unreadable timer: start fresh, keep the speeds.
+            }
+        }
+
+        return new HourglassSettings(
+            ReadSpeed(root, nameof(HourglassSettings.ForwardSpeed)),
+            ReadSpeed(root, nameof(HourglassSettings.BackwardSpeed)),
+            timer);
+    }
+
+    private static double ReadSpeed(JsonElement root, string name) =>
+        root.TryGetProperty(name, out JsonElement value) && value.TryGetDouble(out double speed)
+            ? speed
+            : SpeedPresets.Default;
 }

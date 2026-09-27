@@ -133,8 +133,7 @@ public class MainViewModelTests
         vm.ForwardSpeed = 2;
         vm.BackwardSpeed = 8;
 
-        Assert.Equal(2, _settings.Current.ForwardSpeed);
-        Assert.Equal(8, _settings.Current.BackwardSpeed);
+        Assert.Equal(new HourglassSettings(2, 8), _settings.Current);
     }
 
     [Fact]
@@ -308,7 +307,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void ChangingSpeed_AlsoSavesTheCurrentTimer()
+    public void ChangingSpeed_SavesOnlySpeeds_SoACrashDoesNotRestoreAMidRunTimer()
     {
         var vm = CreateViewModel();
         vm.StartCommand.Execute(null);
@@ -316,7 +315,46 @@ public class MainViewModelTests
 
         vm.BackwardSpeed = 4;
 
+        Assert.Equal(new HourglassSettings(1, 4), _settings.Current);
+    }
+
+    [Fact]
+    public void SaveState_CountsTimeSinceTheLastTick()
+    {
+        var vm = CreateViewModel();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(3);
+        _ticker.Pending = TimeSpan.FromMilliseconds(500);
+
+        vm.SaveState();
+
+        Assert.Equal(TimeSpan.FromSeconds(3.5), _settings.Current.Timer?.Value);
+    }
+
+    [Fact]
+    public void SaveState_WhenStopped_DoesNotFlushTheTicker()
+    {
+        var vm = CreateViewModel();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(3);
+        vm.PauseCommand.Execute(null);
+        _ticker.Pending = TimeSpan.FromSeconds(10);
+
+        vm.SaveState();
+
         Assert.Equal(TimeSpan.FromSeconds(3), _settings.Current.Timer?.Value);
+    }
+
+    [Fact]
+    public void Reopening_ConsumesTheSavedTimer_ButKeepsSpeeds()
+    {
+        var store = new FakeSettingsStore(new HourglassSettings(2, 4,
+            new TimerSnapshot(TimeSpan.FromSeconds(42), TimerState.Paused, TimerDirection.Forward, TimeSpan.Zero)));
+
+        _ = new MainViewModel(_ticker, _alarm, store);
+
+        // If the app now crashed, the next launch would start fresh rather than bring this timer back again.
+        Assert.Equal(new HourglassSettings(2, 4), store.Current);
     }
 
     [Fact]
@@ -326,6 +364,9 @@ public class MainViewModelTests
             new TimerSnapshot(TimeSpan.FromSeconds(42), TimerState.Forward, TimerDirection.Forward, TimeSpan.Zero));
 
         var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+        Assert.False(_ticker.IsRunning); // window start-up time must not count
+
+        vm.Activate();
 
         Assert.True(_ticker.IsRunning);
         Assert.Equal("00:00:42.0", vm.DisplayTime);
@@ -344,6 +385,7 @@ public class MainViewModelTests
             new TimerSnapshot(TimeSpan.FromSeconds(4), TimerState.Backward, TimerDirection.Backward, TimeSpan.FromSeconds(8)));
 
         var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+        vm.Activate();
 
         Assert.Equal(0.5, vm.UpperSand, precision: 6);
         _ticker.Elapse(2); // 4 s at 2x
@@ -359,6 +401,7 @@ public class MainViewModelTests
             new TimerSnapshot(TimeSpan.FromSeconds(7), TimerState.Paused, TimerDirection.Forward, TimeSpan.Zero));
 
         var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+        vm.Activate();
 
         Assert.False(_ticker.IsRunning);
         Assert.Equal("Paused", vm.StatusText);
@@ -376,6 +419,7 @@ public class MainViewModelTests
             new TimerSnapshot(TimeSpan.Zero, TimerState.Idle, TimerDirection.Backward, TimeSpan.FromSeconds(8)));
 
         var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+        vm.Activate();
 
         Assert.False(_alarm.IsPlaying);
         Assert.False(vm.IsRinging);
@@ -391,6 +435,7 @@ public class MainViewModelTests
             new TimerSnapshot(TimeSpan.FromSeconds(-5), TimerState.Forward, TimerDirection.Forward, TimeSpan.Zero));
 
         var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(saved));
+        vm.Activate();
 
         Assert.Equal("00:00:00.0", vm.DisplayTime);
         Assert.Equal("Ready", vm.StatusText);

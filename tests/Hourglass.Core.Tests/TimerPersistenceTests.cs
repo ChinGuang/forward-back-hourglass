@@ -113,6 +113,7 @@ public class TimerPersistenceTests
         new(TimeSpan.FromSeconds(5), TimerState.Backward, TimerDirection.Forward, TimeSpan.Zero),
         new(TimeSpan.Zero, TimerState.Backward, TimerDirection.Backward, TimeSpan.FromSeconds(5)),     // counting down at zero
         new(TimeSpan.FromSeconds(5), TimerState.Paused, TimerDirection.None, TimeSpan.Zero),           // paused but never ran
+        new(TimeSpan.Zero, TimerState.Paused, TimerDirection.Backward, TimeSpan.FromSeconds(5)),       // countdown at zero goes idle, never paused
         new(TimeSpan.FromSeconds(5), TimerState.Idle, TimerDirection.None, TimeSpan.Zero),             // idle with time left
         new(TimeSpan.Zero, TimerState.Idle, TimerDirection.Forward, TimeSpan.Zero),                    // idle is never "after forward"
     };

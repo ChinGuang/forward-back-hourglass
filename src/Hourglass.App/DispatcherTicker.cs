@@ -34,6 +34,14 @@ public sealed class DispatcherTicker : ITicker
         _stopwatch.Stop();
     }
 
+    public void Flush()
+    {
+        if (_timer.IsEnabled)
+        {
+            OnTimerTick(this, EventArgs.Empty);
+        }
+    }
+
     private void OnTimerTick(object? sender, EventArgs e)
     {
         TimeSpan now = _stopwatch.Elapsed;

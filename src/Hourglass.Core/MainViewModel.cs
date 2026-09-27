@@ -34,6 +34,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             // An invalid saved timer is dropped (the timer starts fresh) without losing the speeds.
             _timer.Restore(saved.Timer);
+
+            // The saved timer is consumed: until the app closes normally again the file holds no timer, so a
+            // crash reopens a fresh timer instead of resurrecting this one.
+            _settings.Save(CurrentSettings(includeTimer: false));
         }
 
         StartCommand = new RelayCommand(() => Apply(() => _timer.Start()), () => _timer.CanStart);
@@ -46,9 +50,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ticker.Tick += OnTick;
         _lastCanExecute = CurrentCanExecute();
         _shown = TakeSnapshot();
-
-        // A timer that was running when the app closed carries on from where it was.
-        Sync();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -94,8 +95,23 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsSandFlowing => _shown.Sand.IsFlowing;
 
+    /// <summary>
+    /// Call once the window is on screen. A timer that was running when the app last closed carries on from
+    /// here; waiting until now keeps window start-up time from counting as timer time.
+    /// </summary>
+    public void Activate() => Sync();
+
     /// <summary>Saves the speeds and the timer's current position. Called when the app closes.</summary>
-    public void SaveState() => _settings.Save(CurrentSettings());
+    public void SaveState()
+    {
+        if (_tickerRunning)
+        {
+            // Count the time since the last tick so closing doesn't lose it.
+            _ticker.Flush();
+        }
+
+        _settings.Save(CurrentSettings(includeTimer: true));
+    }
 
     public void Dispose()
     {
@@ -133,7 +149,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _timer.BackwardSpeed = speed;
         }
 
-        _settings.Save(CurrentSettings());
+        _settings.Save(CurrentSettings(includeTimer: false));
         OnPropertyChanged(forward ? nameof(ForwardSpeed) : nameof(BackwardSpeed));
     }
 
@@ -192,8 +208,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _lastCanExecute = canExecute;
     }
 
-    private HourglassSettings CurrentSettings() =>
-        new(_timer.ForwardSpeed, _timer.BackwardSpeed, _timer.ToSnapshot());
+    /// <summary>The timer is only written on close (<see cref="SaveState"/>); other saves store just the speeds.</summary>
+    private HourglassSettings CurrentSettings(bool includeTimer) =>
+        new(_timer.ForwardSpeed, _timer.BackwardSpeed, includeTimer ? _timer.ToSnapshot() : null);
 
     private Snapshot TakeSnapshot() => new(
         TimeFormatter.Format(_timer.Value, roundUp: _timer.LastDirection == TimerDirection.Backward),
