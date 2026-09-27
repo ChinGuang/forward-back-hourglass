@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Lets the app compile on non-Windows machines (e.g. Linux CI); it still only runs on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>Hourglass.App</RootNamespace>
+    <AssemblyName>ForwardBackHourglass</AssemblyName>
+    <ApplicationIcon>Assets\hourglass.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Portable single-file build: dotnet publish -c Release -r win-x64 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <!-- Keep the publish folder to just the .exe (no .pdb from referenced projects). -->
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\ring.wav" />
+    <Resource Include="Assets\hourglass.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hourglass.Core\Hourglass.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,76 @@
+<Window x:Class="Hourglass.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Hourglass.App"
+        Title="Forward-Back Hourglass"
+        Icon="pack://application:,,,/Assets/hourglass.ico"
+        Width="720" Height="440" MinWidth="560" MinHeight="380"
+        WindowStartupLocation="CenterScreen"
+        Background="#FAF7F2">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="3*" />
+        </Grid.ColumnDefinitions>
+
+        <local:HourglassControl Grid.Column="0" Margin="0,0,20,0"
+                                UpperFill="{Binding UpperSand}"
+                                LowerFill="{Binding LowerSand}"
+                                IsFlowing="{Binding IsSandFlowing}"
+                                Direction="{Binding Direction}" />
+
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DisplayTime}"
+                       FontFamily="Consolas" FontSize="56" FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       AutomationProperties.Name="Timer value" />
+
+            <TextBlock Text="{Binding StatusText}" FontSize="18" HorizontalAlignment="Center" Margin="0,0,0,16">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRinging}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AlertBrush}" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <WrapPanel HorizontalAlignment="Center">
+                <Button Content="▶ Start" Command="{Binding StartCommand}" ToolTip="Count forward (also resumes / switches direction)" />
+                <Button Content="◀ Backward" Command="{Binding BackwardCommand}" ToolTip="Count backward to zero" />
+                <Button Content="❚❚ Pause" Command="{Binding PauseCommand}" />
+                <Button Content="⟲ Reset" Command="{Binding ResetCommand}" />
+            </WrapPanel>
+
+            <Grid HorizontalAlignment="Center" Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <Label Grid.Row="0" Grid.Column="0" Content="Forward speed:" Target="{Binding ElementName=ForwardSpeedBox}" FontSize="15" VerticalAlignment="Center" />
+                <ComboBox x:Name="ForwardSpeedBox" Grid.Row="0" Grid.Column="1"
+                          ItemsSource="{Binding SpeedOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                          SelectedValue="{Binding ForwardSpeed}" AutomationProperties.Name="Forward speed" />
+
+                <Label Grid.Row="1" Grid.Column="0" Content="Backward speed:" Target="{Binding ElementName=BackwardSpeedBox}" FontSize="15" VerticalAlignment="Center" />
+                <ComboBox x:Name="BackwardSpeedBox" Grid.Row="1" Grid.Column="1"
+                          ItemsSource="{Binding SpeedOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                          SelectedValue="{Binding BackwardSpeed}" AutomationProperties.Name="Backward speed" />
+            </Grid>
+
+            <Button Content="🔔 Stop ring" Command="{Binding StopRingCommand}"
+                    Visibility="{Binding IsRinging, Converter={StaticResource BoolToVisibility}}"
+                    Background="{StaticResource AlertBrush}" Foreground="White" FontWeight="Bold"
+                    HorizontalAlignment="Center" Margin="0,16,0,0" MinWidth="160" />
+        </StackPanel>
+    </Grid>
+</Window>
