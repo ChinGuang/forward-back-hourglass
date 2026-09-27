@@ -29,7 +29,7 @@ Requires Windows 10 or 11 (x64).
 
 ## Build from source
 
-Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```powershell
 dotnet test Hourglass.sln                                                    # run the unit tests
