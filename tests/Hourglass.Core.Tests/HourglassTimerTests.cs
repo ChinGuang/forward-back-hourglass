@@ -105,11 +105,9 @@ public class HourglassTimerTests
     }
 
     [Fact]
-    public void Backward_ReachingZero_ClampsStopsAndRingsOnce()
+    public void Backward_ReachingZero_ClampsStopsAndRings()
     {
         var timer = new HourglassTimer();
-        int rings = 0;
-        timer.ReachedZero += (_, _) => rings++;
         timer.Start();
         timer.Advance(TimeSpan.FromSeconds(2));
         timer.Backward();
@@ -120,7 +118,6 @@ public class HourglassTimerTests
         Assert.Equal(TimeSpan.Zero, timer.Value);
         Assert.Equal(TimerState.Idle, timer.State);
         Assert.True(timer.IsRinging);
-        Assert.Equal(1, rings);
     }
 
     [Fact]
@@ -277,6 +274,18 @@ public class HourglassTimerTests
         }
 
         Assert.False(timer.IsRinging);
+    }
+
+    [Fact]
+    public void AfterStopRing_ResetIsStillAvailable_ToRefillTheGlass()
+    {
+        var timer = RingingTimer();
+
+        timer.StopRing();
+
+        Assert.True(timer.CanReset);
+        timer.Reset();
+        Assert.Equal(TimerDirection.None, timer.LastDirection);
     }
 
     [Fact]

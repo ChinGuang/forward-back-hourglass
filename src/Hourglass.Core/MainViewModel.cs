@@ -18,6 +18,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _tickerRunning;
     private bool _alarmPlaying;
     private bool[] _lastCanExecute = [];
+    private Snapshot _shown;
 
     public MainViewModel(ITicker ticker, IAlarmPlayer alarm, ISettingsStore settings)
     {
@@ -26,6 +27,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _settings = settings;
 
         HourglassSettings saved = settings.Load();
+        // Snap to presets here so any store (or a hand-edited file) can't put an invalid speed in the timer.
         _timer.ForwardSpeed = SpeedPresets.Normalize(saved.ForwardSpeed);
         _timer.BackwardSpeed = SpeedPresets.Normalize(saved.BackwardSpeed);
 
@@ -38,6 +40,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         _ticker.Tick += OnTick;
         _lastCanExecute = CurrentCanExecute();
+        _shown = TakeSnapshot();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -67,28 +70,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set => SetSpeed(value, forward: false);
     }
 
-    public string DisplayTime => TimeFormatter.Format(_timer.Value);
+    public string DisplayTime => _shown.DisplayTime;
 
-    public TimerState State => _timer.State;
+    public TimerState State => _shown.State;
 
-    public TimerDirection Direction => _timer.LastDirection;
+    public TimerDirection Direction => _shown.Direction;
 
-    public bool IsRinging => _timer.IsRinging;
+    public bool IsRinging => _shown.IsRinging;
 
-    public string StatusText => _timer switch
-    {
-        { IsRinging: true } => "Time's up!",
-        { State: TimerState.Forward } => "Counting forward",
-        { State: TimerState.Backward } => "Counting backward",
-        { State: TimerState.Paused } => "Paused",
-        _ => "Ready",
-    };
+    public string StatusText => _shown.StatusText;
 
-    public double UpperSand => SandLevel.From(_timer).Upper;
+    public double UpperSand => _shown.Sand.Upper;
 
-    public double LowerSand => SandLevel.From(_timer).Lower;
+    public double LowerSand => _shown.Sand.Lower;
 
-    public bool IsSandFlowing => SandLevel.From(_timer).IsFlowing;
+    public bool IsSandFlowing => _shown.Sand.IsFlowing;
 
     public void Dispose()
     {
@@ -159,14 +155,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             }
         }
 
-        OnPropertyChanged(nameof(DisplayTime));
-        OnPropertyChanged(nameof(State));
-        OnPropertyChanged(nameof(Direction));
-        OnPropertyChanged(nameof(IsRinging));
-        OnPropertyChanged(nameof(StatusText));
-        OnPropertyChanged(nameof(UpperSand));
-        OnPropertyChanged(nameof(LowerSand));
-        OnPropertyChanged(nameof(IsSandFlowing));
+        Snapshot previous = _shown;
+        _shown = TakeSnapshot();
+
+        // Direction is raised before the sand levels: the hourglass control reads the levels it is
+        // still showing when a flip starts.
+        RaiseIfChanged(previous.Direction, _shown.Direction, nameof(Direction));
+        RaiseIfChanged(previous.DisplayTime, _shown.DisplayTime, nameof(DisplayTime));
+        RaiseIfChanged(previous.State, _shown.State, nameof(State));
+        RaiseIfChanged(previous.IsRinging, _shown.IsRinging, nameof(IsRinging));
+        RaiseIfChanged(previous.StatusText, _shown.StatusText, nameof(StatusText));
+        RaiseIfChanged(previous.Sand.Upper, _shown.Sand.Upper, nameof(UpperSand));
+        RaiseIfChanged(previous.Sand.Lower, _shown.Sand.Lower, nameof(LowerSand));
+        RaiseIfChanged(previous.Sand.IsFlowing, _shown.Sand.IsFlowing, nameof(IsSandFlowing));
 
         bool[] canExecute = CurrentCanExecute();
         for (int i = 0; i < _commands.Length; i++)
@@ -180,8 +181,40 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _lastCanExecute = canExecute;
     }
 
+    private Snapshot TakeSnapshot() => new(
+        TimeFormatter.Format(_timer.Value, roundUp: _timer.LastDirection == TimerDirection.Backward),
+        _timer.State,
+        _timer.LastDirection,
+        _timer.IsRinging,
+        _timer switch
+        {
+            { IsRinging: true } => "Time's up!",
+            { State: TimerState.Forward } => "Counting forward",
+            { State: TimerState.Backward } => "Counting backward",
+            { State: TimerState.Paused } => "Paused",
+            _ => "Ready",
+        },
+        SandLevel.From(_timer));
+
+    private void RaiseIfChanged<T>(T previous, T current, string name)
+    {
+        if (!EqualityComparer<T>.Default.Equals(previous, current))
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
     private bool[] CurrentCanExecute() => Array.ConvertAll(_commands, c => c.CanExecute(null));
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    /// <summary>What the window currently shows; compared between syncs so only real changes are raised.</summary>
+    private readonly record struct Snapshot(
+        string DisplayTime,
+        TimerState State,
+        TimerDirection Direction,
+        bool IsRinging,
+        string StatusText,
+        SandLevel Sand);
 }

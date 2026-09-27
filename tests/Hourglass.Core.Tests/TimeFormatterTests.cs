@@ -16,6 +16,25 @@ public class TimeFormatterTests
         Assert.Equal(expected, TimeFormatter.Format(TimeSpan.FromMilliseconds(milliseconds)));
     }
 
+    [Theory]
+    [InlineData(0, "00:00:00.0")]
+    [InlineData(1, "00:00:00.1")]              // any time left (here 100 ns) still shows a tenth
+    [InlineData(99_670_000, "00:00:10.0")]     // 9.967 s: doesn't drop a tenth the moment a countdown starts
+    [InlineData(100_000_000, "00:00:10.0")]    // exact tenths are unchanged
+    [InlineData(599_999_900, "00:01:00.0")]    // 59.99999 s: rounding carries into minutes
+    public void Format_RoundUp_ForCountdowns(long ticks, string expected)
+    {
+        var value = TimeSpan.FromTicks(ticks);
+
+        Assert.Equal(expected, TimeFormatter.Format(value, roundUp: true));
+    }
+
+    [Fact]
+    public void Format_RoundUp_AtMaxValue_DoesNotOverflow()
+    {
+        Assert.StartsWith("256204778:", TimeFormatter.Format(TimeSpan.MaxValue, roundUp: true));
+    }
+
     [Fact]
     public void Format_NegativeShowsZero()
     {

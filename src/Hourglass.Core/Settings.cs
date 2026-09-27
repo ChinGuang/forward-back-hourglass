@@ -11,7 +11,10 @@ public interface ISettingsStore
     void Save(HourglassSettings settings);
 }
 
-/// <summary>Stores settings as JSON. A missing or unreadable file falls back to defaults instead of failing startup.</summary>
+/// <summary>
+/// Stores settings as JSON. A missing or unreadable file falls back to defaults instead of failing startup.
+/// Values are returned as stored; the view model snaps them to valid presets.
+/// </summary>
 public sealed class JsonSettingsStore(string filePath) : ISettingsStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
@@ -33,10 +36,7 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
                 return new HourglassSettings();
             }
 
-            var loaded = JsonSerializer.Deserialize<HourglassSettings>(File.ReadAllText(FilePath), Options);
-            return loaded is null
-                ? new HourglassSettings()
-                : new HourglassSettings(SpeedPresets.Normalize(loaded.ForwardSpeed), SpeedPresets.Normalize(loaded.BackwardSpeed));
+            return JsonSerializer.Deserialize<HourglassSettings>(File.ReadAllText(FilePath), Options) ?? new HourglassSettings();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -48,7 +48,12 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            string? directory = Path.GetDirectoryName(Path.GetFullPath(FilePath));
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
             File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, Options));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

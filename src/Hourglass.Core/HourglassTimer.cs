@@ -27,9 +27,6 @@ public sealed class HourglassTimer
     private double _forwardSpeed = SpeedPresets.Default;
     private double _backwardSpeed = SpeedPresets.Default;
 
-    /// <summary>Raised once when counting backward drains the value to exactly zero.</summary>
-    public event EventHandler? ReachedZero;
-
     /// <summary>The current hourglass time. Never negative.</summary>
     public TimeSpan Value { get; private set; } = TimeSpan.Zero;
 
@@ -51,7 +48,7 @@ public sealed class HourglassTimer
 
     public bool CanPause => IsRunning;
 
-    public bool CanReset => Value > TimeSpan.Zero || State != TimerState.Idle || IsRinging;
+    public bool CanReset => Value > TimeSpan.Zero || State != TimerState.Idle || IsRinging || LastDirection != TimerDirection.None;
 
     /// <summary>Speed multiplier while counting forward (e.g. 2 = two timer seconds per real second).</summary>
     public double ForwardSpeed
@@ -150,7 +147,6 @@ public sealed class HourglassTimer
         Value = TimeSpan.Zero;
         State = TimerState.Idle;
         IsRinging = true;
-        ReachedZero?.Invoke(this, EventArgs.Empty);
     }
 
     private static double ValidateSpeed(double speed)

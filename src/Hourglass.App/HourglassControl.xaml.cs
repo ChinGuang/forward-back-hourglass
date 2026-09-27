@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Hourglass.Core;
 
@@ -25,6 +26,15 @@ public partial class HourglassControl : UserControl
     private const double Neck = 150;
     private const double BottomOfLowerBulb = 280;
     private const double BulbHeight = Neck - TopOfUpperBulb;
+    private static readonly TimeSpan FlipDuration = TimeSpan.FromMilliseconds(500);
+
+    // Levels currently drawn, and the levels frozen on screen while the glass turns over.
+    private double _shownUpper = 1;
+    private double _shownLower;
+    private bool _isFlipping;
+    private double _heldUpper;
+    private double _heldLower;
+    private int _flipGeneration;
 
     public HourglassControl()
     {
@@ -70,22 +80,48 @@ public partial class HourglassControl : UserControl
     }
 
     /// <summary>
-    /// Turns the glass over. The new levels are drawn upside down at 180° (so the sand starts where it just was)
-    /// and rotate upright, which reads as a physical flip.
+    /// Turns the glass over. While it turns, the sand it was showing is held (swapped between bulbs, since the
+    /// whole drawing is upside down at 180°), so the picture is continuous with what was on screen. Once
+    /// upright, it settles to the new run's levels. The view model raises Direction before the new levels, so
+    /// the "shown" levels here are still the old ones.
     /// </summary>
     private void PlayFlip()
     {
-        var flip = new DoubleAnimation(180, 0, TimeSpan.FromMilliseconds(500))
+        _heldUpper = _shownLower;
+        _heldLower = _shownUpper;
+        _isFlipping = true;
+
+        // Start from wherever the glass is (it may be mid-flip), expressed in (-180, 180] so it turns the short way.
+        double from = FlipRotation.Angle - 180;
+        if (from <= -180)
+        {
+            from += 360;
+        }
+
+        var flip = new DoubleAnimation(from, 0, FlipDuration * (Math.Abs(from) / 180))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
         };
-        FlipRotation.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, flip);
+        int generation = ++_flipGeneration;
+        flip.Completed += (_, _) =>
+        {
+            if (generation == _flipGeneration)
+            {
+                _isFlipping = false;
+                UpdateSand();
+            }
+        };
+
+        FlipRotation.BeginAnimation(RotateTransform.AngleProperty, flip);
+        UpdateSand();
     }
 
     private void UpdateSand()
     {
-        double upper = Math.Clamp(UpperFill, 0, 1);
-        double lower = Math.Clamp(LowerFill, 0, 1);
+        double upper = Math.Clamp(_isFlipping ? _heldUpper : UpperFill, 0, 1);
+        double lower = Math.Clamp(_isFlipping ? _heldLower : LowerFill, 0, 1);
+        _shownUpper = upper;
+        _shownLower = lower;
 
         // The bulbs are roughly triangles, so area grows with the square of height. Solving for height keeps
         // the amount of sand you see proportional to the fill level.
@@ -99,6 +135,6 @@ public partial class HourglassControl : UserControl
         LowerSandClip.Rect = new Rect(0, lowerSurface, 200, lowerHeight);
 
         Stream.Y2 = lowerSurface;
-        Stream.Visibility = IsFlowing && upper > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Stream.Visibility = IsFlowing && !_isFlipping && upper > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 }

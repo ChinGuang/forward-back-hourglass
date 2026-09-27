@@ -45,12 +45,32 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void Load_OutOfRangeSpeeds_AreSnappedToPresets()
+    public void Load_ReturnsStoredValuesAsIs()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
         File.WriteAllText(SettingsPath, """{ "ForwardSpeed": 1000, "BackwardSpeed": -3 }""");
 
-        Assert.Equal(new HourglassSettings(8, 1), new JsonSettingsStore(SettingsPath).Load());
+        Assert.Equal(new HourglassSettings(1000, -3), new JsonSettingsStore(SettingsPath).Load());
+    }
+
+    [Fact]
+    public void Save_WithBareFileName_DoesNotThrow()
+    {
+        string original = Environment.CurrentDirectory;
+        Directory.CreateDirectory(_dir);
+        try
+        {
+            Environment.CurrentDirectory = _dir;
+            var store = new JsonSettingsStore("settings.json");
+
+            store.Save(new HourglassSettings(2, 2));
+
+            Assert.Equal(new HourglassSettings(2, 2), store.Load());
+        }
+        finally
+        {
+            Environment.CurrentDirectory = original;
+        }
     }
 
     [Fact]

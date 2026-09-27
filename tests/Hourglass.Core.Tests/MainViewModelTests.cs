@@ -156,6 +156,75 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void InvalidSavedSpeeds_AreSnappedToPresets()
+    {
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(new HourglassSettings(1000, -3)));
+
+        Assert.Equal(8, vm.ForwardSpeed);
+        Assert.Equal(1, vm.BackwardSpeed);
+    }
+
+    [Fact]
+    public void Countdown_ShowsZeroOnlyWhenItRings()
+    {
+        var vm = CreateViewModel();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(1);
+        vm.BackwardCommand.Execute(null);
+
+        _ticker.Elapse(0.95);
+
+        Assert.Equal("00:00:00.1", vm.DisplayTime);
+        Assert.False(vm.IsRinging);
+
+        _ticker.Elapse(0.05);
+
+        Assert.Equal("00:00:00.0", vm.DisplayTime);
+        Assert.True(vm.IsRinging);
+    }
+
+    [Fact]
+    public void Tick_OnlyRaisesPropertiesThatChanged()
+    {
+        var vm = CreateViewModel();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(1);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _ticker.Elapse(1);
+
+        Assert.DoesNotContain(nameof(MainViewModel.State), changed);
+        Assert.DoesNotContain(nameof(MainViewModel.StatusText), changed);
+        Assert.DoesNotContain(nameof(MainViewModel.Direction), changed);
+        Assert.Contains(nameof(MainViewModel.DisplayTime), changed);
+    }
+
+    [Fact]
+    public void DirectionChange_IsRaisedBeforeSandLevels()
+    {
+        var vm = CreateViewModel();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(10);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.BackwardCommand.Execute(null);
+
+        Assert.True(changed.IndexOf(nameof(MainViewModel.Direction)) < changed.IndexOf(nameof(MainViewModel.UpperSand)));
+    }
+
+    [Fact]
+    public void StopRing_LeavesResetEnabled()
+    {
+        var vm = RingingViewModel();
+
+        vm.StopRingCommand.Execute(null);
+
+        Assert.True(vm.ResetCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void SpeedOptions_ListAllPresetsWithLabels()
     {
         var vm = CreateViewModel();
