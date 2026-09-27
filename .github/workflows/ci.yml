@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, test & package (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Test
+        run: dotnet test Hourglass.sln -c Release --logger "console;verbosity=normal"
+
+      - name: Publish portable exe
+        run: dotnet publish src/Hourglass.App -c Release -r win-x64 -o artifacts/publish
+
+      - name: Smoke test (app launches and shows its window)
+        shell: pwsh
+        run: |
+          $exe = "artifacts/publish/ForwardBackHourglass.exe"
+          $p = Start-Process $exe -PassThru
+          $deadline = (Get-Date).AddSeconds(30)
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 1
+            if ($p.HasExited) { throw "App exited early with code $($p.ExitCode)" }
+            $p.Refresh()
+            if ($p.MainWindowTitle -eq "Forward-Back Hourglass") { break }
+          }
+          if ($p.MainWindowTitle -ne "Forward-Back Hourglass") {
+            Stop-Process -Id $p.Id -Force
+            throw "Main window did not appear (title: '$($p.MainWindowTitle)')"
+          }
+          Write-Host "Main window is up; closing."
+          Stop-Process -Id $p.Id -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ForwardBackHourglass-win-x64
+          path: artifacts/publish/ForwardBackHourglass.exe
+          if-no-files-found: error
+
+  release:
+    name: Attach exe to GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ForwardBackHourglass-win-x64
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ForwardBackHourglass.exe
+          generate_release_notes: true

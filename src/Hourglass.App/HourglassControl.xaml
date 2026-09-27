@@ -1,0 +1,52 @@
+<UserControl x:Class="Hourglass.App.HourglassControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Hourglass">
+    <UserControl.Resources>
+        <PathGeometry x:Key="UpperBulb" Figures="M30,20 L170,20 L104,150 L96,150 Z" />
+        <PathGeometry x:Key="LowerBulb" Figures="M96,150 L104,150 L170,280 L30,280 Z" />
+    </UserControl.Resources>
+
+    <Viewbox Stretch="Uniform">
+        <!-- Drawn on a fixed 200x300 canvas; the Viewbox scales it to the available space. -->
+        <Canvas Width="200" Height="300" RenderTransformOrigin="0.5,0.5">
+            <Canvas.RenderTransform>
+                <RotateTransform x:Name="FlipRotation" Angle="0" />
+            </Canvas.RenderTransform>
+
+            <Path Data="{StaticResource UpperBulb}" Fill="{StaticResource GlassBrush}" />
+            <Path Data="{StaticResource LowerBulb}" Fill="{StaticResource GlassBrush}" />
+
+            <Path x:Name="UpperSand" Data="{StaticResource UpperBulb}" Fill="{StaticResource SandBrush}">
+                <Path.Clip>
+                    <RectangleGeometry x:Name="UpperSandClip" Rect="0,150,200,0" />
+                </Path.Clip>
+            </Path>
+            <Path x:Name="LowerSand" Data="{StaticResource LowerBulb}" Fill="{StaticResource SandBrush}">
+                <Path.Clip>
+                    <RectangleGeometry x:Name="LowerSandClip" Rect="0,280,200,0" />
+                </Path.Clip>
+            </Path>
+
+            <Line x:Name="Stream" X1="100" Y1="148" X2="100" Y2="280"
+                  Stroke="{StaticResource SandBrush}" StrokeThickness="3"
+                  StrokeDashArray="2 1.5" Visibility="Collapsed">
+                <Line.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetProperty="StrokeDashOffset"
+                                                 From="0" To="-7" Duration="0:0:0.35" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Line.Triggers>
+            </Line>
+
+            <Path Data="{StaticResource UpperBulb}" Stroke="{StaticResource FrameBrush}" StrokeThickness="5" StrokeLineJoin="Round" />
+            <Path Data="{StaticResource LowerBulb}" Stroke="{StaticResource FrameBrush}" StrokeThickness="5" StrokeLineJoin="Round" />
+            <Rectangle Canvas.Left="16" Canvas.Top="4" Width="168" Height="18" RadiusX="4" RadiusY="4" Fill="{StaticResource FrameBrush}" />
+            <Rectangle Canvas.Left="16" Canvas.Top="278" Width="168" Height="18" RadiusX="4" RadiusY="4" Fill="{StaticResource FrameBrush}" />
+        </Canvas>
+    </Viewbox>
+</UserControl>
