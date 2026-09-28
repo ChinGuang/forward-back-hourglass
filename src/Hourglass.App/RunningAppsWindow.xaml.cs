@@ -47,6 +47,12 @@ public partial class RunningAppsWindow : Window
 
                     string path = NativeMethods.GetProcessPath((uint)process.Id) ?? process.ProcessName + ".exe";
                     string fileName = Path.GetFileName(path);
+                    if (KnownBrowsers.Find(fileName) is not null)
+                    {
+                        // Inside supported browsers the website decides; see the Websites tab.
+                        continue;
+                    }
+
                     apps.TryAdd(fileName, new RunningApp(fileName, path, process.MainWindowTitle));
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)

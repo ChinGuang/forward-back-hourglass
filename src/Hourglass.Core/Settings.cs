@@ -13,7 +13,7 @@ public sealed record HourglassSettings(
     bool AutoMode = false,
     AutoRules? Rules = null)
 {
-    public AutoRules? Rules { get; init; } = Rules ?? AutoRules.Empty;
+    public AutoRules Rules { get; init; } = Rules ?? AutoRules.Empty;
 }
 
 public interface ISettingsStore

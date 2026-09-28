@@ -13,6 +13,8 @@ public class BrowserUrlTests
     [InlineData("192.168.1.10/admin", "192.168.1.10")]
     [InlineData("https://bücher.de", "xn--bcher-kva.de")]           // stored in ASCII form
     [InlineData("example.com.", "example.com")]
+    [InlineData("web.archive.org/web/2020/https://example.com", "web.archive.org")]   // "://" inside the path
+    [InlineData("google.com/url?q=https://x.com", "google.com")]
     public void Sites(string text, string host)
     {
         Assert.Equal(new BrowserUrl(BrowserUrlKind.Site, host), BrowserUrl.Parse(text));

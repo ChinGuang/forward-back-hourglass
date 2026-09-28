@@ -78,18 +78,16 @@ public class AutoModeEngineTests
 
         Assert.Equal(new AutoDecision(RuleAction.Backward, AutoReason.UnclassifiedSite, "reddit.com", "reddit.com"), first);
         Assert.Equal(new AutoDecision(RuleAction.Backward, AutoReason.UnclassifiedSite, "reddit.com"), again);
-        Assert.Equal(["reddit.com"], _engine.SeenUnclassified);
     }
 
     [Fact]
-    public void MarkClassified_RemovesFromSeenList()
+    public void AddressWithUrlInItsPath_UsesTheRealSite()
     {
-        _engine.Decide(new ActiveWindow("brave.exe", 5, "reddit.com"), Rules);
-        _engine.Decide(new ActiveWindow("brave.exe", 5, "twitch.tv"), Rules);
+        var rules = Rules with { Sites = [new SiteRule("web.archive.org", RuleAction.Forward)] };
 
-        _engine.MarkClassified("reddit.com");
+        AutoDecision decision = _engine.Decide(new ActiveWindow("brave.exe", 5, "web.archive.org/web/2020/https://youtube.com"), rules);
 
-        Assert.Equal(["twitch.tv"], _engine.SeenUnclassified);
+        Assert.Equal(new AutoDecision(RuleAction.Forward, AutoReason.SiteRule, "web.archive.org"), decision);
     }
 
     [Theory]
@@ -100,7 +98,6 @@ public class AutoModeEngineTests
         AutoDecision decision = _engine.Decide(new ActiveWindow("brave.exe", 5, url), Rules);
 
         Assert.Equal(new AutoDecision(RuleAction.Pause, AutoReason.InternalPage, "Brave"), decision);
-        Assert.Empty(_engine.SeenUnclassified);
     }
 
     [Fact]

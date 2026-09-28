@@ -34,10 +34,6 @@ public sealed class AutoModeEngine
 
     private readonly Dictionary<long, BrowserUrl> _lastUrlByWindow = [];
     private readonly HashSet<string> _prompted = [];
-    private readonly List<string> _seenUnclassified = [];
-
-    /// <summary>Unclassified sites seen this session, in the order they were first seen.</summary>
-    public IReadOnlyList<string> SeenUnclassified => _seenUnclassified;
 
     public AutoDecision Decide(ActiveWindow? window, AutoRules rules)
     {
@@ -55,10 +51,6 @@ public sealed class AutoModeEngine
             ? new AutoDecision(app.Action, AutoReason.AppRule, app.FileName)
             : new AutoDecision(RuleAction.Pause, AutoReason.UntrackedApp, AppRule.NormalizeFileName(window.ProcessFileName));
     }
-
-    /// <summary>Called once the user classifies a site, so it leaves the "seen but not classified" list.</summary>
-    public void MarkClassified(string domain) =>
-        _seenUnclassified.RemoveAll(seen => Domains.IsSameOrSubdomain(seen, domain));
 
     private AutoDecision DecideForBrowser(ActiveWindow window, BrowserProfile browser, AutoRules rules)
     {
@@ -87,11 +79,6 @@ public sealed class AutoModeEngine
         }
 
         string suggested = Domains.Suggest(url.Host);
-        if (!_seenUnclassified.Contains(suggested))
-        {
-            _seenUnclassified.Add(suggested);
-        }
-
         string? prompt = _prompted.Add(suggested) ? suggested : null;
         return new AutoDecision(RuleAction.Backward, AutoReason.UnclassifiedSite, suggested, prompt);
     }

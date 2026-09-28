@@ -30,7 +30,24 @@ public static class Domains
             return null;
         }
 
-        return host.StartsWith("www.", StringComparison.Ordinal) && host.Length > 4 ? host[4..] : host;
+        string domain = host.StartsWith("www.", StringComparison.Ordinal) ? host[4..] : host;
+        return IsTooBroad(domain) ? null : domain;
+    }
+
+    /// <summary>
+    /// True for "domains" that would match huge numbers of unrelated sites: a bare TLD (<c>com</c>) or a
+    /// country second level (<c>co.uk</c>). Such a rule could only come from input like <c>www.co.uk</c>.
+    /// </summary>
+    private static bool IsTooBroad(string domain)
+    {
+        if (domain == "localhost" || IPAddress.TryParse(domain, out _))
+        {
+            return false;
+        }
+
+        string[] labels = domain.Split('.');
+        return labels.Length < 2
+            || (labels.Length == 2 && labels[1].Length == 2 && CountrySecondLevels.Contains(labels[0]));
     }
 
     public static bool IsSameOrSubdomain(string host, string domain)

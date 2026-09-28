@@ -16,7 +16,7 @@ public class RulesViewModelTests
         Assert.True(rules.AddApp(@"C:\Program Files\Microsoft VS Code\Code.exe", RuleAction.Forward));
 
         Assert.Equal(["Code.exe"], rules.Apps.Select(a => a.Name));
-        Assert.Equal([new AppRule("Code.exe", RuleAction.Forward)], _settings.Current.Rules!.Apps);
+        Assert.Equal([new AppRule("Code.exe", RuleAction.Forward)], _settings.Current.Rules.Apps);
     }
 
     [Fact]
@@ -28,6 +28,35 @@ public class RulesViewModelTests
         rules.AddApp("code", RuleAction.Backward);
 
         Assert.Equal([("Code.exe", RuleAction.Backward)], rules.Apps.Select(a => (a.Name, a.Action)));
+    }
+
+    [Theory]
+    [InlineData("brave.exe")]
+    [InlineData(@"C:\Program Files\Opera\opera.exe")]
+    [InlineData("vivaldi")]
+    [InlineData("chrome.exe")]
+    public void AddApp_RefusesBrowsers_WebsitesDecideThere(string browser)
+    {
+        var rules = CreateRules();
+
+        Assert.False(rules.AddApp(browser, RuleAction.Forward));
+        Assert.Empty(rules.Apps);
+    }
+
+    [Fact]
+    public void ToRules_IsCached_UntilAnEdit()
+    {
+        var rules = CreateRules();
+        rules.AddApp("Code.exe", RuleAction.Forward);
+
+        AutoRules first = rules.ToRules();
+        Assert.Same(first, rules.ToRules());
+
+        rules.Apps[0].Action = RuleAction.Backward;
+        AutoRules afterEdit = rules.ToRules();
+
+        Assert.NotSame(first, afterEdit);
+        Assert.Equal([new AppRule("Code.exe", RuleAction.Backward)], afterEdit.Apps);
     }
 
     [Theory]
@@ -73,7 +102,7 @@ public class RulesViewModelTests
 
         rules.Sites[0].Action = RuleAction.Pause;
 
-        Assert.Equal([new SiteRule("youtube.com", RuleAction.Pause)], _settings.Current.Rules!.Sites);
+        Assert.Equal([new SiteRule("youtube.com", RuleAction.Pause)], _settings.Current.Rules.Sites);
     }
 
     [Fact]

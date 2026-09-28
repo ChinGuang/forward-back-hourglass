@@ -30,7 +30,7 @@ public partial class AppsWindow : Window
         var picker = new RunningAppsWindow { Owner = this };
         if (picker.ShowDialog() == true && picker.Choice is { } choice)
         {
-            _rules.AddApp(choice.PathOrName, choice.Action);
+            AddApp(choice.PathOrName, choice.Action);
         }
     }
 
@@ -45,8 +45,24 @@ public partial class AppsWindow : Window
         if (dialog.ShowDialog(this) == true)
         {
             // New apps start as Forward; change it in the list.
-            _rules.AddApp(dialog.FileName, RuleAction.Forward);
+            AddApp(dialog.FileName, RuleAction.Forward);
         }
+    }
+
+    private void AddApp(string pathOrName, RuleAction action)
+    {
+        if (KnownBrowsers.Find(pathOrName) is { } browser)
+        {
+            MessageBox.Show(
+                this,
+                $"{browser.DisplayName} is followed by website instead: add the sites you use on the Websites tab.",
+                "Browsers are handled by website",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        _rules.AddApp(pathOrName, action);
     }
 
     private void OnAddSite(object sender, RoutedEventArgs e)

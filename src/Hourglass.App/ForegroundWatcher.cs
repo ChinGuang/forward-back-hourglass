@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Windows.Automation;
 using System.Windows.Threading;
 using Hourglass.Core;
@@ -30,7 +29,18 @@ public sealed class ForegroundWatcher(Dispatcher dispatcher) : IForegroundWatche
 
         var running = new CancellationTokenSource();
         _running = running;
-        var thread = new Thread(() => Watch(running.Token)) { IsBackground = true, Name = "Foreground watcher" };
+        var thread = new Thread(() =>
+        {
+            // The thread owns the token source and disposes it once it stops (Stop only cancels it).
+            using (running)
+            {
+                Watch(running.Token);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Foreground watcher",
+        };
         thread.SetApartmentState(ApartmentState.MTA);
         thread.Start();
     }
@@ -49,7 +59,20 @@ public sealed class ForegroundWatcher(Dispatcher dispatcher) : IForegroundWatche
 
         while (!stop.IsCancellationRequested)
         {
-            ActiveWindow? current = ReadActiveWindow(addressBars);
+            ActiveWindow? current;
+            try
+            {
+                current = ReadActiveWindow(addressBars);
+            }
+            catch (Exception)
+            {
+                // This thread must never die: an unexpected failure reading another app (a hung window, access
+                // denied, a UI Automation timeout) would otherwise take the whole app down. Skip this reading.
+                addressBars.Clear();
+                stop.WaitHandle.WaitOne(PollInterval);
+                continue;
+            }
+
             if (!reported || current != last)
             {
                 reported = true;
@@ -112,11 +135,19 @@ public sealed class ForegroundWatcher(Dispatcher dispatcher) : IForegroundWatche
                 cached.Element = found?.Element;
             }
 
-            return cached.Element is null ? null : UiaNode.ReadValue(cached.Element);
+            if (cached.Element is null)
+            {
+                return null;
+            }
+
+            // While you're typing in the address bar it shows half an address ("github.c"); report "unknown" so
+            // the last real page keeps counting until you press Enter.
+            return cached.Element.Current.HasKeyboardFocus ? null : UiaNode.ReadValue(cached.Element);
         }
-        catch (Exception ex) when (ex is ElementNotAvailableException or COMException or InvalidOperationException or ArgumentException)
+        catch (Exception)
         {
-            // The window or its toolbar went away (closed, full screen, re-created): search again later.
+            // Any UI Automation failure (window closed, full screen, re-created, timed out, access denied):
+            // treat the address as unknown and search again later.
             cached.Element = null;
             return null;
         }

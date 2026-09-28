@@ -14,6 +14,13 @@ public class AutoModeViewModelTests
     private readonly FakeForegroundWatcher _watcher = new();
     private readonly FakeSettingsStore _settings = new(new HourglassSettings(1, 1, AutoMode: true, Rules: Rules));
 
+    /// <summary>The countdown's starting point, read back through a save.</summary>
+    private TimeSpan SnapshotPeak(MainViewModel vm)
+    {
+        vm.SaveState();
+        return _settings.Current.Timer!.BackwardPeak;
+    }
+
     private MainViewModel CreateActive()
     {
         var vm = new MainViewModel(_ticker, _alarm, _settings, _watcher);
@@ -228,6 +235,49 @@ public class AutoModeViewModelTests
     }
 
     [Fact]
+    public void UnclassifiedList_KeepsEachSiteOnce_AndDropsItWhenClassified()
+    {
+        var vm = CreateActive();
+        _watcher.ShowBrowser("reddit.com");
+        _watcher.ShowBrowser("twitch.tv");
+        _watcher.ShowBrowser("www.reddit.com/r/x");
+        Assert.Equal(["reddit.com", "twitch.tv"], vm.Rules.Unclassified);
+
+        vm.Rules.AddSite("reddit.com", RuleAction.Forward);
+
+        Assert.Equal(["twitch.tv"], vm.Rules.Unclassified);
+    }
+
+    [Fact]
+    public void SwitchingApps_CountsTheTimeSinceTheLastTickInTheOldDirection()
+    {
+        var vm = CreateActive();
+        _watcher.ShowApp("code.exe");
+        _ticker.Elapse(10);
+        _ticker.Pending = TimeSpan.FromSeconds(1); // real time since the last tick, spent in Code.exe
+
+        _watcher.ShowApp("game.exe");
+
+        Assert.Equal("00:00:11.0", vm.DisplayTime);
+        Assert.Equal(TimeSpan.FromSeconds(11), SnapshotPeak(vm)); // the countdown starts from 11 s
+    }
+
+    [Fact]
+    public void ManualButtons_AlsoCountTheTimeSinceTheLastTickFirst()
+    {
+        var vm = new MainViewModel(_ticker, _alarm, new FakeSettingsStore(), _watcher);
+        vm.Activate();
+        vm.StartCommand.Execute(null);
+        _ticker.Elapse(10);
+        _ticker.Pending = TimeSpan.FromSeconds(1);
+
+        vm.BackwardCommand.Execute(null);
+        _ticker.Elapse(1);
+
+        Assert.Equal("00:00:10.0", vm.DisplayTime);
+    }
+
+    [Fact]
     public void ClassifyingTheCurrentSite_TakesEffectImmediately_AndIsSaved()
     {
         var vm = CreateActive();
@@ -239,7 +289,7 @@ public class AutoModeViewModelTests
 
         Assert.Equal(TimerState.Paused, vm.State);
         Assert.Empty(vm.Rules.Unclassified);
-        Assert.Contains(new SiteRule("reddit.com", RuleAction.Pause), _settings.Current.Rules!.Sites);
+        Assert.Contains(new SiteRule("reddit.com", RuleAction.Pause), _settings.Current.Rules.Sites);
     }
 
     [Fact]
@@ -252,7 +302,7 @@ public class AutoModeViewModelTests
         vm.Rules.Apps.Single(a => a.Name == "Code.exe").Action = RuleAction.Pause;
 
         Assert.Equal(TimerState.Paused, vm.State);
-        Assert.Contains(new AppRule("Code.exe", RuleAction.Pause), _settings.Current.Rules!.Apps);
+        Assert.Contains(new AppRule("Code.exe", RuleAction.Pause), _settings.Current.Rules.Apps);
     }
 
     [Fact]

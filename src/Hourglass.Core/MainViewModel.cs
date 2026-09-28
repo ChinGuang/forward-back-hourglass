@@ -32,13 +32,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _alarm = alarm;
         _settings = settings;
         _watcher = watcher;
-        Rules = new RulesViewModel(OnRulesChanged, _engine.MarkClassified);
+        Rules = new RulesViewModel(OnRulesChanged);
 
         HourglassSettings saved = settings.Load();
         // Snap to presets here so any store (or a hand-edited file) can't put an invalid speed in the timer.
         _timer.ForwardSpeed = SpeedPresets.Normalize(saved.ForwardSpeed);
         _timer.BackwardSpeed = SpeedPresets.Normalize(saved.BackwardSpeed);
-        Rules.Load((saved.Rules ?? AutoRules.Empty).Sanitized());
+        Rules.Load(saved.Rules.Sanitized());
         _autoMode = saved.AutoMode;
         if (saved.Timer is not null)
         {
@@ -160,12 +160,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>Saves the speeds and the timer's current position. Called when the app closes.</summary>
     public void SaveState()
     {
-        if (_tickerRunning)
-        {
-            // Count the time since the last tick so closing doesn't lose it.
-            _ticker.Flush();
-        }
-
+        FlushTicker();
         _settings.Save(CurrentSettings(includeTimer: true));
     }
 
@@ -222,6 +217,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         AutoDecision decision = _engine.Decide(_activeWindow, Rules.ToRules());
         _lastDecision = decision;
+        FlushTicker();
         switch (decision.Action)
         {
             case RuleAction.Forward:
@@ -238,11 +234,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 break;
         }
 
-        Rules.NoteUnclassified(_engine.SeenUnclassified);
+        if (decision.Reason == AutoReason.UnclassifiedSite && decision.Subject is { } unclassified)
+        {
+            Rules.NoteUnclassified(unclassified);
+        }
+
         Sync();
         if (decision.PromptDomain is { } domain)
         {
             ClassifyRequested?.Invoke(this, domain);
+        }
+    }
+
+    /// <summary>
+    /// Counts the time since the last tick in the current direction, before the direction changes or the timer is
+    /// saved; otherwise it would be counted the new way (or lost).
+    /// </summary>
+    private void FlushTicker()
+    {
+        if (_tickerRunning)
+        {
+            _ticker.Flush();
         }
     }
 
@@ -254,6 +266,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void Apply(Action action)
     {
+        FlushTicker();
         action();
         Sync();
     }

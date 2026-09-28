@@ -30,7 +30,14 @@ public readonly record struct BrowserUrl(BrowserUrlKind Kind, string? Host)
             return Unreadable;
         }
 
+        // A scheme is only a scheme at the very start (letters, digits, + - .); "://" later on is part of the
+        // path or query, e.g. web.archive.org/web/2020/https://example.com.
         int schemeEnd = text.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd >= 0 && !IsScheme(text.AsSpan(0, schemeEnd)))
+        {
+            schemeEnd = -1;
+        }
+
         if (schemeEnd < 0 && (text.StartsWith("about:", StringComparison.OrdinalIgnoreCase)
             || text.StartsWith("view-source:", StringComparison.OrdinalIgnoreCase)
             || text.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
@@ -61,5 +68,23 @@ public readonly record struct BrowserUrl(BrowserUrlKind Kind, string? Host)
         string host = uri.IdnHost.TrimEnd('.').ToLowerInvariant();
         bool looksLikeHost = host.Contains('.') || host == "localhost" || uri.HostNameType == UriHostNameType.IPv6;
         return looksLikeHost ? new BrowserUrl(BrowserUrlKind.Site, host) : Unreadable;
+    }
+
+    private static bool IsScheme(ReadOnlySpan<char> text)
+    {
+        if (text.IsEmpty || !char.IsAsciiLetter(text[0]))
+        {
+            return false;
+        }
+
+        foreach (char c in text)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c is not ('+' or '-' or '.'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

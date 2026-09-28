@@ -41,12 +41,11 @@ public sealed class RuleItem : INotifyPropertyChanged
 public sealed class RulesViewModel
 {
     private readonly Action _changed;
-    private readonly Action<string> _classified;
+    private AutoRules? _current;
 
-    internal RulesViewModel(Action changed, Action<string> classified)
+    internal RulesViewModel(Action changed)
     {
         _changed = changed;
-        _classified = classified;
     }
 
     public static IReadOnlyList<RuleAction> ActionChoices { get; } = [RuleAction.Forward, RuleAction.Pause, RuleAction.Backward];
@@ -56,19 +55,23 @@ public sealed class RulesViewModel
     public ObservableCollection<RuleItem> Sites { get; } = [];
 
     /// <summary>Websites seen this session that have no rule yet (they count backward until classified).</summary>
+    /// <remarks>The single list of unclassified sites; auto mode adds to it, classifying removes from it.</remarks>
     public ObservableCollection<string> Unclassified { get; } = [];
 
-    /// <summary>Adds an app from a path or file name, or updates its action if it's already listed.</summary>
+    /// <summary>
+    /// Adds an app from a path or file name, or updates its action if it's already listed. Supported browsers are
+    /// refused: inside them the website decides, so an app rule would never apply.
+    /// </summary>
     public bool AddApp(string pathOrName, RuleAction action)
     {
         string? name = AppRule.NormalizeFileName(pathOrName);
-        if (name is null || !Enum.IsDefined(action))
+        if (name is null || !Enum.IsDefined(action) || KnownBrowsers.Find(name) is not null)
         {
             return false;
         }
 
         Upsert(Apps, name, action, StringComparer.OrdinalIgnoreCase);
-        _changed();
+        Changed();
         return true;
     }
 
@@ -87,8 +90,7 @@ public sealed class RulesViewModel
             Unclassified.Remove(seen);
         }
 
-        _classified(domain);
-        _changed();
+        Changed();
         return true;
     }
 
@@ -96,38 +98,43 @@ public sealed class RulesViewModel
     {
         if (Apps.Remove(item) || Sites.Remove(item))
         {
-            _changed();
+            Changed();
         }
     }
 
-    public AutoRules ToRules() => new(
+    /// <summary>The rules as a snapshot; rebuilt only after an edit, since auto mode reads it on every window change.</summary>
+    public AutoRules ToRules() => _current ??= new AutoRules(
         Apps.Select(item => new AppRule(item.Name, item.Action)).ToArray(),
         Sites.Select(item => new SiteRule(item.Name, item.Action)).ToArray());
 
     internal void Load(AutoRules rules)
     {
+        _current = null;
         Apps.Clear();
         Sites.Clear();
         foreach (AppRule app in rules.Apps)
         {
-            Apps.Add(new RuleItem(app.FileName, app.Action, _changed));
+            Apps.Add(new RuleItem(app.FileName, app.Action, Changed));
         }
 
         foreach (SiteRule site in rules.Sites)
         {
-            Sites.Add(new RuleItem(site.Domain, site.Action, _changed));
+            Sites.Add(new RuleItem(site.Domain, site.Action, Changed));
         }
     }
 
-    internal void NoteUnclassified(IEnumerable<string> domains)
+    internal void NoteUnclassified(string domain)
     {
-        foreach (string domain in domains)
+        if (!Unclassified.Contains(domain))
         {
-            if (!Unclassified.Contains(domain) && !Sites.Any(site => Domains.IsSameOrSubdomain(domain, site.Name)))
-            {
-                Unclassified.Add(domain);
-            }
+            Unclassified.Add(domain);
         }
+    }
+
+    private void Changed()
+    {
+        _current = null;
+        _changed();
     }
 
     private void Upsert(ObservableCollection<RuleItem> items, string name, RuleAction action, StringComparer comparer)
@@ -135,12 +142,12 @@ public sealed class RulesViewModel
         RuleItem? existing = items.FirstOrDefault(item => comparer.Equals(item.Name, name));
         if (existing is null)
         {
-            items.Add(new RuleItem(name, action, _changed));
+            items.Add(new RuleItem(name, action, Changed));
             return;
         }
 
         // Update without a second save; the caller saves once.
         int index = items.IndexOf(existing);
-        items[index] = new RuleItem(existing.Name, action, _changed);
+        items[index] = new RuleItem(existing.Name, action, Changed);
     }
 }
