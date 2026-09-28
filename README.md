@@ -26,6 +26,26 @@ The hourglass animation turns over when you change direction:
 
 The timer and the speeds are saved in `%APPDATA%\ForwardBackHourglass\settings.json` when the window closes, and also when Windows shuts down or logs off. If the app crashes or is ended from Task Manager, it reopens with a fresh timer. Your speeds are kept.
 
+## Auto mode: follow apps and websites
+
+Turn on **Auto: follow apps & sites** and the timer is driven by whatever is in front of you, instead of the buttons:
+
+- **Apps & sites…** keeps your rules. Each app or website is set to **Forward**, **Backward** or **Pause**, e.g. `Code.exe` → Forward (earn time) and `youtube.com` → Backward (spend it).
+  - **Apps:** pick one from the apps currently open, or browse for any `.exe`. Apps are matched by program file name, so they keep matching after an update moves the install folder.
+  - **Websites:** type a domain or paste a page address. `youtube.com` also covers `www.youtube.com`, `m.youtube.com` and every page on YouTube. A more specific rule wins, so `music.youtube.com` beats `youtube.com`.
+- **What the timer does:**
+  - An app or website with a rule: the timer follows it.
+  - Anything else, including the hourglass window itself: the timer pauses.
+  - A countdown you come back to resumes where it was, rather than refilling the glass.
+- **Browsers:** in **Brave, Opera and Vivaldi** the website in the active tab decides. **Chrome and Edge** use the same engine and should work, but are untested.
+  - **A site without a rule** counts **backward**. The first time you visit one, a small popup in the bottom-right corner asks whether it should count Forward, Pause or Backward. The popup never takes focus, so your video and typing aren't interrupted. Sites you haven't classified are also listed in **Apps & sites…** so you can classify them later.
+  - **Browser pages** such as a new tab, settings or local files pause the timer and never prompt.
+  - **When the address can't be read**, for example a full-screen video or F11, the timer keeps following the last site read from that window.
+- **When a countdown reaches zero** in auto mode, the ring plays and the hourglass window jumps to the front until you stop it. Games running in *exclusive* full-screen can't be covered by any window, but you'll still hear the ring.
+- **Buttons:** Start, Backward and Pause are greyed out while auto mode is on. Reset and the speeds still work.
+
+**How the website is read:** the app reads the browser's address bar through Windows UI Automation, the accessibility interface screen readers use. It only looks at the browser's own toolbar, never at page content. It needs no browser extension, and nothing leaves your PC.
+
 ## Download
 
 1. Go to the repository's [**Releases**](https://github.com/ChinGuang/forward-back-hourglass/releases) page and download `ForwardBackHourglass.exe` from the latest release. There's nothing to unzip or install.

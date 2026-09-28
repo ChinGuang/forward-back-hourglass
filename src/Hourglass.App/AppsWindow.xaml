@@ -1,0 +1,70 @@
+<Window x:Class="Hourglass.App.AppsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:Hourglass.Core;assembly=Hourglass.Core"
+        Title="Apps &amp; sites" Width="560" Height="560" MinWidth="460" MinHeight="420"
+        WindowStartupLocation="CenterOwner" Background="#FAF7F2">
+    <Window.Resources>
+        <!-- Action dropdown + remove button shared by both rule lists. -->
+        <DataTemplate x:Key="RuleRow" DataType="{x:Type core:RuleItem}">
+            <DockPanel Margin="2">
+                <Button DockPanel.Dock="Right" Content="Remove" MinWidth="0" Padding="8,2" Click="OnRemove" />
+                <ComboBox DockPanel.Dock="Right" Width="110"
+                          ItemsSource="{x:Static core:RulesViewModel.ActionChoices}" SelectedItem="{Binding Action}" />
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="14" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <TabControl Margin="10">
+        <TabItem Header="Apps">
+            <DockPanel Margin="8">
+                <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Text="While one of these apps is the active window, the timer follows its setting. Other apps pause the timer." />
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="Add running app…" Click="OnAddRunningApp" />
+                    <Button Content="Browse for .exe…" Click="OnBrowseApp" />
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Apps}" ItemTemplate="{StaticResource RuleRow}" HorizontalContentAlignment="Stretch" />
+            </DockPanel>
+        </TabItem>
+
+        <TabItem Header="Websites">
+            <DockPanel Margin="8">
+                <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8">
+                    In Brave, Opera and Vivaldi (Chrome and Edge: untested) the website decides. A domain covers its
+                    subdomains, e.g. youtube.com also covers m.youtube.com. Sites without a rule count backward.
+                </TextBlock>
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Content="Add" Click="OnAddSite" IsDefault="True" />
+                    <ComboBox x:Name="NewSiteAction" DockPanel.Dock="Right" Width="110"
+                              ItemsSource="{x:Static core:RulesViewModel.ActionChoices}" SelectedIndex="0" />
+                    <TextBox x:Name="NewSiteText" FontSize="14" VerticalContentAlignment="Center" Margin="0,4,4,4"
+                             ToolTip="A domain like youtube.com, or paste a page's address" />
+                </DockPanel>
+                <TextBlock x:Name="SiteError" DockPanel.Dock="Top" Foreground="{StaticResource AlertBrush}"
+                           Visibility="Collapsed" Margin="0,0,0,6" Text="That doesn't look like a website address." />
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                    <TextBlock Text="Seen but not classified yet (counting backward):" FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{Binding Unclassified}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="2">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Button Content="Forward" Tag="Forward" MinWidth="0" Padding="8,2" Click="OnClassify" />
+                                        <Button Content="Pause" Tag="Pause" MinWidth="0" Padding="8,2" Click="OnClassify" />
+                                        <Button Content="Backward" Tag="Backward" MinWidth="0" Padding="8,2" Click="OnClassify" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" FontSize="14" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <ListBox ItemsSource="{Binding Sites}" ItemTemplate="{StaticResource RuleRow}" HorizontalContentAlignment="Stretch" />
+            </DockPanel>
+        </TabItem>
+    </TabControl>
+</Window>

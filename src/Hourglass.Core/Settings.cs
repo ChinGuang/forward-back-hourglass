@@ -4,10 +4,17 @@ using System.Text.Json.Serialization;
 namespace Hourglass.Core;
 
 /// <param name="Timer">The timer as it was when the app closed; null (e.g. in files from older versions) means a fresh timer.</param>
+/// <param name="AutoMode">Whether the timer follows the app or website in front.</param>
+/// <param name="Rules">Tracked apps and websites; null is read as none.</param>
 public sealed record HourglassSettings(
     double ForwardSpeed = SpeedPresets.Default,
     double BackwardSpeed = SpeedPresets.Default,
-    TimerSnapshot? Timer = null);
+    TimerSnapshot? Timer = null,
+    bool AutoMode = false,
+    AutoRules? Rules = null)
+{
+    public AutoRules? Rules { get; init; } = Rules ?? AutoRules.Empty;
+}
 
 public interface ISettingsStore
 {
@@ -73,7 +80,7 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
         }
     }
 
-    /// <summary>Reads each part on its own, so a damaged timer section can't cost the user their speeds.</summary>
+    /// <summary>Reads each part on its own, so a damaged timer or rules section can't cost the user the rest.</summary>
     private static HourglassSettings Parse(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object)
@@ -94,10 +101,28 @@ public sealed class JsonSettingsStore(string filePath) : ISettingsStore
             }
         }
 
+        AutoRules? rules = null;
+        if (root.TryGetProperty(nameof(HourglassSettings.Rules), out JsonElement rulesJson) && rulesJson.ValueKind == JsonValueKind.Object)
+        {
+            try
+            {
+                rules = rulesJson.Deserialize<AutoRules>(Options);
+            }
+            catch (JsonException)
+            {
+                // Unreadable rules: start with none, keep everything else.
+            }
+        }
+
+        bool autoMode = root.TryGetProperty(nameof(HourglassSettings.AutoMode), out JsonElement autoJson)
+            && autoJson.ValueKind == JsonValueKind.True;
+
         return new HourglassSettings(
             ReadSpeed(root, nameof(HourglassSettings.ForwardSpeed)),
             ReadSpeed(root, nameof(HourglassSettings.BackwardSpeed)),
-            timer);
+            timer,
+            autoMode,
+            rules);
     }
 
     private static double ReadSpeed(JsonElement root, string name) =>

@@ -1,6 +1,7 @@
 <Application x:Class="Hourglass.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Hourglass.App"
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <SolidColorBrush x:Key="FrameBrush" Color="#3C2A1E" />
@@ -9,6 +10,7 @@
         <SolidColorBrush x:Key="AccentBrush" Color="#2E6DA4" />
         <SolidColorBrush x:Key="AlertBrush" Color="#C0392B" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <local:NotNullConverter x:Key="NotNull" />
 
         <Style TargetType="Button">
             <Setter Property="MinWidth" Value="96" />

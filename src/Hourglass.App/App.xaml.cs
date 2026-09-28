@@ -14,7 +14,8 @@ public partial class App : Application
         _viewModel = new MainViewModel(
             new DispatcherTicker(),
             new SoundPlayerAlarm(),
-            new JsonSettingsStore(JsonSettingsStore.DefaultPath));
+            new JsonSettingsStore(JsonSettingsStore.DefaultPath),
+            new ForegroundWatcher(Dispatcher));
 
         MainWindow = new MainWindow(_viewModel);
         MainWindow.Show();

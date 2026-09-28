@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:Hourglass.App"
         Title="Forward-Back Hourglass"
         Icon="pack://application:,,,/Assets/hourglass.ico"
-        Width="720" Height="440" MinWidth="560" MinHeight="380"
+        Width="760" Height="520" MinWidth="600" MinHeight="460"
         WindowStartupLocation="CenterScreen"
         Background="#FAF7F2">
     <Grid Margin="20">
@@ -66,6 +66,20 @@
                           ItemsSource="{Binding SpeedOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
                           SelectedValue="{Binding BackwardSpeed}" AutomationProperties.Name="Backward speed" />
             </Grid>
+
+            <Border BorderBrush="#D9CFC2" BorderThickness="0,1,0,0" Margin="0,16,0,0" Padding="0,10,0,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox Content="Auto: follow apps &amp; sites" IsChecked="{Binding IsAutoMode}"
+                                  FontSize="15" VerticalAlignment="Center" VerticalContentAlignment="Center" Margin="4"
+                                  ToolTip="The app or website in front decides whether the timer counts forward, backward or pauses" />
+                        <Button Content="Apps &amp; sites…" Click="OnOpenApps" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding AutoStatusText}" HorizontalAlignment="Center" TextWrapping="Wrap"
+                               TextAlignment="Center" Foreground="{StaticResource AccentBrush}" FontSize="13"
+                               AutomationProperties.Name="Auto mode status" />
+                </StackPanel>
+            </Border>
 
             <Button Content="🔔 Stop ring" Command="{Binding StopRingCommand}"
                     Visibility="{Binding IsRinging, Converter={StaticResource BoolToVisibility}}"

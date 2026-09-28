@@ -66,3 +66,48 @@ internal sealed class FakeSettingsStore(HourglassSettings? initial = null) : ISe
         SaveCount++;
     }
 }
+
+internal sealed class FakeForegroundWatcher : IForegroundWatcher
+{
+    public event EventHandler<ActiveWindow?>? Changed;
+
+    public bool IsRunning { get; private set; }
+
+    public void Start() => IsRunning = true;
+
+    public void Stop() => IsRunning = false;
+
+    public void Show(ActiveWindow? window) => Changed?.Invoke(this, window);
+
+    public void ShowApp(string fileName, long handle = 1) => Show(new ActiveWindow(fileName, handle));
+
+    public void ShowBrowser(string url, string browser = "brave.exe", long handle = 100) =>
+        Show(new ActiveWindow(browser, handle, url));
+}
+
+/// <summary>A node in a fake accessibility tree. Counts how often its children are enumerated.</summary>
+internal sealed class FakeUi(UiControlType type, string name = "", string? value = null, params FakeUi[] children) : IUiElement
+{
+    public UiControlType ControlType { get; } = type;
+
+    public string Name { get; } = name;
+
+    public string? Value { get; } = value;
+
+    public int ChildReads { get; private set; }
+
+    public IEnumerable<IUiElement> Children
+    {
+        get
+        {
+            ChildReads++;
+            return children;
+        }
+    }
+
+    public static FakeUi Pane(params FakeUi[] children) => new(UiControlType.Other, "", null, children);
+
+    public static FakeUi Doc(params FakeUi[] children) => new(UiControlType.Document, "", null, children);
+
+    public static FakeUi Edit(string name, string? value) => new(UiControlType.Edit, name, value);
+}
