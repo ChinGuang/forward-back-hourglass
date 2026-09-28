@@ -12,6 +12,19 @@ internal sealed class FakeTicker : ITicker
 
     public void Stop() => IsRunning = false;
 
+    /// <summary>Time "since the last tick" that <see cref="Flush"/> delivers.</summary>
+    public TimeSpan Pending { get; set; }
+
+    public void Flush()
+    {
+        if (IsRunning && Pending > TimeSpan.Zero)
+        {
+            Tick?.Invoke(this, Pending);
+        }
+
+        Pending = TimeSpan.Zero;
+    }
+
     /// <summary>Simulates the UI timer firing; only delivers ticks while started, like the real one.</summary>
     public void Elapse(TimeSpan elapsed)
     {

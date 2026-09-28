@@ -18,7 +18,13 @@ The hourglass animation turns over when you change direction:
 - **Forward:** sand fills the bottom bulb once per 60 seconds of timer time.
 - **Backward:** the top bulb shows how much time is left out of the value you started counting down from, and it empties exactly at zero.
 
-Speeds are saved in `%APPDATA%\ForwardBackHourglass\settings.json`.
+**The timer is remembered when you close the app.** Reopening puts it back exactly where it was, and time does not pass while the app is closed:
+
+- A running timer carries on in the same direction.
+- A paused timer stays paused.
+- A countdown that had already finished reopens drained and silent. Press Reset to refill the glass.
+
+The timer and the speeds are saved in `%APPDATA%\ForwardBackHourglass\settings.json` when the window closes, and also when Windows shuts down or logs off. If the app crashes or is ended from Task Manager, it reopens with a fresh timer. Your speeds are kept.
 
 ## Download
 

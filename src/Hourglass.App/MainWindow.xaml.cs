@@ -15,8 +15,15 @@ public partial class MainWindow : Window
         DataContext = viewModel;
     }
 
+    protected override void OnContentRendered(EventArgs e)
+    {
+        base.OnContentRendered(e);
+        _viewModel.Activate();
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
+        _viewModel.SaveState();
         _viewModel.Dispose();
         base.OnClosing(e);
     }
