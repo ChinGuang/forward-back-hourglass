@@ -144,6 +144,41 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveThenLoad_RoundTripsAutoModeAndRules()
+    {
+        var store = new JsonSettingsStore(SettingsPath);
+        var rules = new AutoRules(
+            [new AppRule("Code.exe", RuleAction.Forward)],
+            [new SiteRule("youtube.com", RuleAction.Backward), new SiteRule("news.com", RuleAction.Pause)]);
+
+        store.Save(new HourglassSettings(2, 4, AutoMode: true, Rules: rules));
+
+        Assert.Equal(new HourglassSettings(2, 4, AutoMode: true, Rules: rules), new JsonSettingsStore(SettingsPath).Load());
+        Assert.Contains("\"Backward\"", File.ReadAllText(SettingsPath));
+    }
+
+    [Fact]
+    public void Load_UnreadableRules_AreDropped_ButEverythingElseIsKept()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath, """{ "ForwardSpeed": 4, "BackwardSpeed": 0.5, "AutoMode": true, "Rules": { "Apps": [ { "FileName": "a.exe", "Action": "Sideways" } ] } }""");
+
+        Assert.Equal(new HourglassSettings(4, 0.5, AutoMode: true), new JsonSettingsStore(SettingsPath).Load());
+    }
+
+    [Fact]
+    public void Load_Version100File_HasAutoModeOffAndNoRules()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath, """{ "ForwardSpeed": 2, "BackwardSpeed": 1, "Timer": null }""");
+
+        HourglassSettings loaded = new JsonSettingsStore(SettingsPath).Load();
+
+        Assert.False(loaded.AutoMode);
+        Assert.Equal(AutoRules.Empty, loaded.Rules);
+    }
+
+    [Fact]
     public void DefaultPath_IsUnderAppDataFolder()
     {
         Assert.EndsWith(Path.Combine("ForwardBackHourglass", "settings.json"), JsonSettingsStore.DefaultPath);
