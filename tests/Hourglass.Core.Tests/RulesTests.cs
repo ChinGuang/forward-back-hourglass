@@ -35,6 +35,24 @@ public class RulesTests
     }
 
     [Fact]
+    public void AppRule_NormalizesItsNameWhenCreated()
+    {
+        Assert.Equal("Code.exe", new AppRule(@"C:\Apps\Code", RuleAction.Forward).FileName);
+        Assert.Equal(new AppRule("code.exe", RuleAction.Forward), new AppRule("code", RuleAction.Forward));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AppRule_BlankNamesNeverMatch(string blank)
+    {
+        var rule = new AppRule(blank, RuleAction.Forward);
+
+        Assert.False(rule.Matches(""));
+        Assert.False(rule.Matches(blank));
+    }
+
+    [Fact]
     public void FindSite_MostSpecificRuleWins()
     {
         var rules = new AutoRules([], [

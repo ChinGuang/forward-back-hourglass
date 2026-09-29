@@ -65,7 +65,7 @@ public partial class AppsWindow : Window
 
     private void OnAddRunningApp(object sender, RoutedEventArgs e)
     {
-        var picker = new RunningAppsWindow { Owner = this };
+        var picker = new RunningAppsWindow(_rules.ToRules()) { Owner = this };
         if (picker.ShowDialog() == true && picker.Choice is { } choice)
         {
             AddApp(choice.PathOrName, choice.Action);
