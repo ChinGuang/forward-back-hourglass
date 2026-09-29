@@ -5,7 +5,7 @@
         Title="Add a running app" Width="460" Height="480" MinWidth="360" MinHeight="300"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#FAF7F2">
     <DockPanel Margin="12">
-        <TextBlock DockPanel.Dock="Top" Text="Pick an open app to track (apps you've already added aren't listed):"
+        <TextBlock DockPanel.Dock="Top" Text="Pick an open app to track. Apps you've already added aren't listed; change those in the Apps list."
                    FontSize="14" Margin="0,0,0,8" TextWrapping="Wrap" />
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="Search:" VerticalAlignment="Center" FontSize="14" Margin="0,0,6,0" />

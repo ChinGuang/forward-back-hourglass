@@ -12,6 +12,9 @@ public enum RuleAction
 /// <param name="Speed">Its own multiplier; null uses the main Forward/Backward speed.</param>
 public sealed record AppRule(string FileName, RuleAction Action, double? Speed = null)
 {
+    /// <summary>Normalised once when the rule is made (<c>C:\Apps\Code</c> → <c>Code.exe</c>), so matching is a plain comparison.</summary>
+    public string FileName { get; init; } = NormalizeFileName(FileName) ?? FileName;
+
     /// <summary>
     /// Turns a path or name into the stored form: <c>C:\Apps\Code.exe</c>, <c>Code.exe</c> and <c>Code</c> all
     /// become <c>Code.exe</c>. Returns null when nothing usable is left.
@@ -34,9 +37,9 @@ public sealed record AppRule(string FileName, RuleAction Action, double? Speed =
         return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : name + ".exe";
     }
 
-    /// <summary>Same program, ignoring case and a missing ".exe" on either side.</summary>
+    /// <summary>Same program, ignoring case and a missing ".exe". A blank or unreadable name never matches.</summary>
     public bool Matches(string processFileName) =>
-        string.Equals(NormalizeFileName(processFileName), NormalizeFileName(FileName), StringComparison.OrdinalIgnoreCase);
+        NormalizeFileName(processFileName) is { } name && string.Equals(name, FileName, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>A website matched by domain: <c>youtube.com</c> also covers <c>www.youtube.com</c>, <c>m.youtube.com</c>, …</summary>

@@ -10,7 +10,7 @@ public class RunningAppFilterTests
         new("Code.exe", "forward-back-hourglass - Visual Studio Code"),
         new("slack.exe", "Slack – general"),
         new("game.exe", "Space Game"),
-        new("notepad.exe", "todo.txt - Notepad"),
+        new("notepad.exe", "a.txt - Notepad", "todo.txt - Notepad"),   // two windows
         new("brave.exe", "YouTube - Brave"),
     ];
 
@@ -45,7 +45,7 @@ public class RunningAppFilterTests
     [InlineData("code", new[] { "Code.exe" })]              // program name, any case
     [InlineData("SLACK", new[] { "slack.exe" })]
     [InlineData("general", new[] { "slack.exe" })]          // window title
-    [InlineData("todo", new[] { "notepad.exe" })]
+    [InlineData("todo", new[] { "notepad.exe" })]           // the second window's title
     [InlineData(".exe", new[] { "Code.exe", "slack.exe", "game.exe", "notepad.exe" })]
     [InlineData("  game  ", new[] { "game.exe" })]          // surrounding spaces ignored
     [InlineData("zzz", new string[0])]
@@ -72,20 +72,36 @@ public class RunningAppFilterTests
     {
         Assert.Equal(
             "All open apps are already added. Use \"Browse for .exe…\" to add another program.",
-            RunningAppFilter.EmptyMessage(addableCount: 0, matchCount: 0, query: "anything"));
+            RunningAppFilter.EmptyMessage(trackableCount: 2, addableCount: 0, matchCount: 0, query: "anything"));
+    }
+
+    [Fact]
+    public void EmptyMessage_WhenNoAppsAreOpen_OrOnlyBrowsers()
+    {
+        var onlyBrowser = new[] { new App("brave.exe", "YouTube - Brave") };
+
+        int trackable = RunningAppFilter.Trackable(onlyBrowser).Count;
+
+        Assert.Equal(0, trackable);
+        Assert.Equal(
+            "No other open apps found. Use \"Browse for .exe…\" to add a program.",
+            RunningAppFilter.EmptyMessage(trackable, addableCount: 0, matchCount: 0, query: ""));
     }
 
     [Fact]
     public void EmptyMessage_WhenTheSearchMatchesNothing()
     {
-        Assert.Equal("No open app matches \"zzz\".", RunningAppFilter.EmptyMessage(addableCount: 3, matchCount: 0, query: " zzz "));
+        Assert.Equal("No open app matches \"zzz\".", RunningAppFilter.EmptyMessage(trackableCount: 3, addableCount: 3, matchCount: 0, query: " zzz "));
     }
 
     [Fact]
     public void EmptyMessage_NoneWhenThereIsSomethingToPick()
     {
-        Assert.Null(RunningAppFilter.EmptyMessage(addableCount: 3, matchCount: 1, query: "code"));
+        Assert.Null(RunningAppFilter.EmptyMessage(trackableCount: 3, addableCount: 3, matchCount: 1, query: "code"));
     }
 
-    private sealed record App(string FileName, string Title) : IRunningApp;
+    private sealed record App(string FileName, params string[] WindowTitles) : IRunningApp
+    {
+        public IReadOnlyList<string> Titles => WindowTitles;
+    }
 }

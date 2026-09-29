@@ -13,6 +13,7 @@ namespace Hourglass.App;
 public partial class RunningAppsWindow : Window
 {
     private IReadOnlyList<RunningApp> _addable = [];
+    private int _trackableCount;
 
     /// <param name="existingRules">The rules already set up; those apps are left out of the list.</param>
     public RunningAppsWindow(AutoRules existingRules)
@@ -21,12 +22,19 @@ public partial class RunningAppsWindow : Window
         Loaded += async (_, _) =>
         {
             SearchBox.Focus();
-            List<RunningApp> running = await Task.Run(FindRunningApps);
-            _addable = RunningAppFilter.Addable(running, existingRules);
-            foreach (RunningApp app in _addable)
+            (_addable, _trackableCount) = await Task.Run(() =>
             {
-                app.Icon = LoadIcon(app.Path);
-            }
+                List<RunningApp> running = FindRunningApps();
+                IReadOnlyList<RunningApp> addable = RunningAppFilter.Addable(running, existingRules);
+
+                // Icons are loaded (and frozen) here, off the UI thread, so typing in the search box never stalls.
+                foreach (RunningApp app in addable)
+                {
+                    app.Icon = LoadIcon(app.Path);
+                }
+
+                return (addable, RunningAppFilter.Trackable(running).Count);
+            });
 
             LoadingText.Visibility = Visibility.Collapsed;
             ShowMatches();
@@ -41,7 +49,7 @@ public partial class RunningAppsWindow : Window
         // Select the first match so Enter adds it straight away.
         AppList.SelectedIndex = matches.Count > 0 ? 0 : -1;
 
-        string? message = RunningAppFilter.EmptyMessage(_addable.Count, matches.Count, SearchBox.Text);
+        string? message = RunningAppFilter.EmptyMessage(_trackableCount, _addable.Count, matches.Count, SearchBox.Text);
         MessageText.Text = message ?? "";
         MessageText.Visibility = message is null ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -79,6 +87,7 @@ public partial class RunningAppsWindow : Window
     /// <summary>The picked app's path (or file name) and action, once the window closes with Add.</summary>
     public (string PathOrName, RuleAction Action)? Choice { get; private set; }
 
+    /// <summary>One entry per program (browsers included; the filter decides what to show), with all its window titles.</summary>
     private static List<RunningApp> FindRunningApps()
     {
         int self = Environment.ProcessId;
@@ -96,13 +105,14 @@ public partial class RunningAppsWindow : Window
 
                     string path = NativeMethods.GetProcessPath((uint)process.Id) ?? process.ProcessName + ".exe";
                     string fileName = Path.GetFileName(path);
-                    if (KnownBrowsers.Find(fileName) is not null)
+                    if (apps.TryGetValue(fileName, out RunningApp? existing))
                     {
-                        // Inside supported browsers the website decides; see the Websites tab.
-                        continue;
+                        existing.AddTitle(process.MainWindowTitle);
                     }
-
-                    apps.TryAdd(fileName, new RunningApp(fileName, path, process.MainWindowTitle));
+                    else
+                    {
+                        apps.Add(fileName, new RunningApp(fileName, path, process.MainWindowTitle));
+                    }
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
                 {
@@ -148,8 +158,21 @@ public partial class RunningAppsWindow : Window
         }
     }
 
-    public sealed record RunningApp(string FileName, string Path, string Title) : IRunningApp
+    public sealed class RunningApp(string fileName, string path, string firstTitle) : IRunningApp
     {
+        private readonly List<string> _titles = [firstTitle];
+
+        public string FileName { get; } = fileName;
+
+        public string Path { get; } = path;
+
+        public IReadOnlyList<string> Titles => _titles;
+
+        /// <summary>What the list shows: the first window's title, plus how many more windows there are.</summary>
+        public string Title => _titles.Count == 1 ? _titles[0] : $"{_titles[0]}  (+{_titles.Count - 1} more)";
+
         public ImageSource? Icon { get; set; }
+
+        public void AddTitle(string title) => _titles.Add(title);
     }
 }
