@@ -5,10 +5,26 @@
         Title="Apps &amp; sites" Width="560" Height="560" MinWidth="460" MinHeight="420"
         WindowStartupLocation="CenterOwner" Background="#FAF7F2">
     <Window.Resources>
-        <!-- Action dropdown + remove button shared by both rule lists. -->
+        <!-- Speed box: "Default", a preset, or any positive number typed in. Red when the text isn't valid. -->
+        <Style x:Key="SpeedBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="ToolTip" Value="Default uses the main Forward/Backward speed. Pick a preset or type any positive number, e.g. 1.5" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasSpeedError}" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource AlertBrush}" />
+                    <Setter Property="BorderThickness" Value="2" />
+                    <Setter Property="ToolTip" Value="Use a number above 0 (e.g. 2 or 1.5), or Default" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Action dropdown, speed box and remove button shared by both rule lists. -->
         <DataTemplate x:Key="RuleRow" DataType="{x:Type core:RuleItem}">
             <DockPanel Margin="2">
                 <Button DockPanel.Dock="Right" Content="Remove" MinWidth="0" Padding="8,2" Click="OnRemove" />
+                <ComboBox DockPanel.Dock="Right" Width="96" IsEditable="True" Style="{StaticResource SpeedBox}"
+                          ItemsSource="{x:Static core:RuleItem.SpeedChoices}"
+                          Text="{Binding SpeedText, UpdateSourceTrigger=PropertyChanged}"
+                          IsEnabled="{Binding IsSpeedEnabled}" AutomationProperties.Name="Speed" />
                 <ComboBox DockPanel.Dock="Right" Width="110"
                           ItemsSource="{x:Static core:RulesViewModel.ActionChoices}" SelectedItem="{Binding Action}" />
                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="14" TextTrimming="CharacterEllipsis" />
@@ -20,7 +36,7 @@
         <TabItem Header="Apps">
             <DockPanel Margin="8">
                 <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8"
-                           Text="While one of these apps is the active window, the timer follows its setting. Other apps pause the timer." />
+                           Text="While one of these apps is the active window, the timer follows its setting. Other apps pause the timer. Speed: Default uses the main speed, or pick/type a multiplier (e.g. 1.5)." />
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Content="Add running app…" Click="OnAddRunningApp" />
                     <Button Content="Browse for .exe…" Click="OnBrowseApp" />

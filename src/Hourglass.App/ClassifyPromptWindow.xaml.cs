@@ -14,14 +14,15 @@ public partial class ClassifyPromptWindow : Window
 {
     private static readonly TimeSpan ShowFor = TimeSpan.FromSeconds(20);
 
-    private readonly Action<RuleAction> _choose;
+    private readonly Action<RuleAction, double?> _choose;
     private readonly DispatcherTimer _hideTimer;
 
-    public ClassifyPromptWindow(string domain, Action<RuleAction> choose)
+    public ClassifyPromptWindow(string domain, Action<RuleAction, double?> choose)
     {
         InitializeComponent();
         _choose = choose;
         DomainRun.Text = domain;
+        SpeedBox.ItemsSource = RuleItem.SpeedChoices;
         _hideTimer = new DispatcherTimer { Interval = ShowFor };
         _hideTimer.Tick += (_, _) => Close();
         Loaded += (_, _) => PlaceInCorner();
@@ -44,9 +45,10 @@ public partial class ClassifyPromptWindow : Window
 
     private void OnChoose(object sender, RoutedEventArgs e)
     {
-        if (Enum.TryParse(((Button)sender).Tag as string, out RuleAction action))
+        if (Enum.TryParse(((Button)sender).Tag as string, out RuleAction action)
+            && SpeedPresets.TryParseRuleSpeed(SpeedBox.SelectedItem as string, out double? speed))
         {
-            _choose(action);
+            _choose(action, speed);
         }
 
         Close();

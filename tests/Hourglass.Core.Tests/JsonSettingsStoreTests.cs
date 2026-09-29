@@ -179,6 +179,31 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveThenLoad_RoundTripsRuleSpeeds()
+    {
+        var store = new JsonSettingsStore(SettingsPath);
+        var rules = new AutoRules(
+            [new AppRule("Code.exe", RuleAction.Forward, 2.5), new AppRule("notes.exe", RuleAction.Forward)],
+            [new SiteRule("youtube.com", RuleAction.Backward, 12.75)]);
+
+        store.Save(new HourglassSettings(AutoMode: true, Rules: rules));
+
+        Assert.Equal(rules, new JsonSettingsStore(SettingsPath).Load().Rules);
+    }
+
+    [Fact]
+    public void Load_Version110Rules_WithoutSpeeds_UseTheMainSpeed()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        File.WriteAllText(SettingsPath, """{ "AutoMode": true, "Rules": { "Apps": [ { "FileName": "Code.exe", "Action": "Forward" } ], "Sites": [ { "Domain": "youtube.com", "Action": "Backward" } ] } }""");
+
+        AutoRules rules = new JsonSettingsStore(SettingsPath).Load().Rules;
+
+        Assert.Null(rules.Apps[0].Speed);
+        Assert.Null(rules.Sites[0].Speed);
+    }
+
+    [Fact]
     public void DefaultPath_IsUnderAppDataFolder()
     {
         Assert.EndsWith(Path.Combine("ForwardBackHourglass", "settings.json"), JsonSettingsStore.DefaultPath);
