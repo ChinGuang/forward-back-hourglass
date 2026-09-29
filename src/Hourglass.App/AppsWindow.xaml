@@ -21,10 +21,13 @@
         <DataTemplate x:Key="RuleRow" DataType="{x:Type core:RuleItem}">
             <DockPanel Margin="2">
                 <Button DockPanel.Dock="Right" Content="Remove" MinWidth="0" Padding="8,2" Click="OnRemove" />
-                <ComboBox DockPanel.Dock="Right" Width="96" IsEditable="True" Style="{StaticResource SpeedBox}"
+                <!-- Applied on Enter, leaving the box, picking from the list, or closing the window; not per keystroke. -->
+                <ComboBox DockPanel.Dock="Right" Width="96" IsEditable="True" IsTextSearchEnabled="False"
+                          Style="{StaticResource SpeedBox}"
                           ItemsSource="{x:Static core:RuleItem.SpeedChoices}"
-                          Text="{Binding SpeedText, UpdateSourceTrigger=PropertyChanged}"
-                          IsEnabled="{Binding IsSpeedEnabled}" AutomationProperties.Name="Speed" />
+                          Text="{Binding SpeedText, UpdateSourceTrigger=LostFocus}"
+                          IsEnabled="{Binding IsSpeedEnabled}" AutomationProperties.Name="Speed"
+                          KeyDown="OnSpeedKeyDown" DropDownClosed="OnSpeedPicked" />
                 <ComboBox DockPanel.Dock="Right" Width="110"
                           ItemsSource="{x:Static core:RulesViewModel.ActionChoices}" SelectedItem="{Binding Action}" />
                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="14" TextTrimming="CharacterEllipsis" />

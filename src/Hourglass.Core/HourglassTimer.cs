@@ -34,6 +34,9 @@ public sealed class HourglassTimer
     private double _backwardSpeed = SpeedPresets.Default;
     private double? _speedOverride;
 
+    // Fractions of a tick not yet counted, so very small speeds still add up over many frames.
+    private double _tickRemainder;
+
     /// <summary>The current hourglass time. Never negative.</summary>
     public TimeSpan Value { get; private set; } = TimeSpan.Zero;
 
@@ -96,6 +99,7 @@ public sealed class HourglassTimer
         IsRinging = false;
         State = TimerState.Forward;
         LastDirection = TimerDirection.Forward;
+        _tickRemainder = 0;
         return true;
     }
 
@@ -117,6 +121,7 @@ public sealed class HourglassTimer
         IsRinging = false;
         State = TimerState.Backward;
         LastDirection = TimerDirection.Backward;
+        _tickRemainder = 0;
         return true;
     }
 
@@ -139,6 +144,7 @@ public sealed class HourglassTimer
         State = TimerState.Idle;
         LastDirection = TimerDirection.None;
         IsRinging = false;
+        _tickRemainder = 0;
     }
 
     public void StopRing() => IsRinging = false;
@@ -177,12 +183,12 @@ public sealed class HourglassTimer
 
         if (State == TimerState.Forward)
         {
-            TimeSpan step = Scale(realElapsed, CurrentSpeed);
+            TimeSpan step = Scale(realElapsed, CurrentSpeed, ref _tickRemainder);
             Value = step > TimeSpan.MaxValue - Value ? TimeSpan.MaxValue : Value + step;
             return;
         }
 
-        TimeSpan drain = Scale(realElapsed, CurrentSpeed);
+        TimeSpan drain = Scale(realElapsed, CurrentSpeed, ref _tickRemainder);
         if (drain < Value)
         {
             Value -= drain;
@@ -210,11 +216,23 @@ public sealed class HourglassTimer
             _ => s.Value == TimeSpan.Zero && s.LastDirection != TimerDirection.Forward,
         };
 
-    /// <summary>elapsed × speed, saturating at <see cref="TimeSpan.MaxValue"/> instead of overflowing for huge speeds.</summary>
-    private static TimeSpan Scale(TimeSpan elapsed, double speed)
+    /// <summary>
+    /// elapsed × speed in whole ticks, carrying the fraction to the next call (so 1e-6× still counts, just slowly)
+    /// and saturating at <see cref="TimeSpan.MaxValue"/> instead of overflowing for huge speeds.
+    /// </summary>
+    private static TimeSpan Scale(TimeSpan elapsed, double speed, ref double remainder)
     {
-        double ticks = Math.Round(elapsed.Ticks * speed);
-        return ticks >= TimeSpan.MaxValue.Ticks ? TimeSpan.MaxValue : TimeSpan.FromTicks((long)ticks);
+        double exact = elapsed.Ticks * speed + remainder;
+        if (exact >= TimeSpan.MaxValue.Ticks)
+        {
+            remainder = 0;
+            return TimeSpan.MaxValue;
+        }
+
+        // Round away float noise (e.g. 2.9999999999 → 3) before splitting off the fraction.
+        double whole = Math.Floor(exact + 1e-6);
+        remainder = Math.Max(exact - whole, 0);
+        return TimeSpan.FromTicks((long)whole);
     }
 
     private static double ValidateSpeed(double speed)

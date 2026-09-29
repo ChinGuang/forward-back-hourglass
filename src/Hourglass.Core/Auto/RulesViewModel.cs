@@ -80,6 +80,30 @@ public sealed class RuleItem : INotifyPropertyChanged
 
     public bool HasSpeedError => _hasSpeedError;
 
+    /// <summary>
+    /// Changes the rule in place (the caller saves). With <paramref name="keepSpeed"/> the speed and any text still
+    /// being typed in the speed box are left alone.
+    /// </summary>
+    internal void Update(RuleAction action, bool keepSpeed, double? speed)
+    {
+        if (_action != action)
+        {
+            _action = action;
+            Raise(nameof(Action));
+            Raise(nameof(IsSpeedEnabled));
+        }
+
+        if (!keepSpeed)
+        {
+            _speed = speed;
+            _speedText = SpeedPresets.Label(speed);
+            _hasSpeedError = false;
+            Raise(nameof(Speed));
+            Raise(nameof(SpeedText));
+            Raise(nameof(HasSpeedError));
+        }
+    }
+
     private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
@@ -108,18 +132,18 @@ public sealed class RulesViewModel
     /// Adds an app from a path or file name, or updates its action if it's already listed (keeping its speed).
     /// Supported browsers are refused: inside them the website decides, so an app rule would never apply.
     /// </summary>
-    public bool AddApp(string pathOrName, RuleAction action) => AddApp(pathOrName, action, keepSpeed: true, speed: null);
+    public bool AddApp(string pathOrName, RuleAction action) => AddOrSetApp(pathOrName, action, keepSpeed: true, speed: null);
 
-    /// <summary>Adds or updates an app with its own speed (null = the main speed).</summary>
-    public bool AddApp(string pathOrName, RuleAction action, double? speed) => AddApp(pathOrName, action, keepSpeed: false, speed);
+    /// <summary>Adds or replaces an app rule with exactly this action and speed (null speed = the main speed).</summary>
+    public bool SetApp(string pathOrName, RuleAction action, double? speed) => AddOrSetApp(pathOrName, action, keepSpeed: false, speed);
 
     /// <summary>Adds a website rule (any URL or domain the user typed), or updates its action if it exists (keeping its speed).</summary>
-    public bool AddSite(string urlOrDomain, RuleAction action) => AddSite(urlOrDomain, action, keepSpeed: true, speed: null);
+    public bool AddSite(string urlOrDomain, RuleAction action) => AddOrSetSite(urlOrDomain, action, keepSpeed: true, speed: null);
 
-    /// <summary>Adds or updates a website rule with its own speed (null = the main speed).</summary>
-    public bool AddSite(string urlOrDomain, RuleAction action, double? speed) => AddSite(urlOrDomain, action, keepSpeed: false, speed);
+    /// <summary>Adds or replaces a website rule with exactly this action and speed (null speed = the main speed).</summary>
+    public bool SetSite(string urlOrDomain, RuleAction action, double? speed) => AddOrSetSite(urlOrDomain, action, keepSpeed: false, speed);
 
-    private bool AddApp(string pathOrName, RuleAction action, bool keepSpeed, double? speed)
+    private bool AddOrSetApp(string pathOrName, RuleAction action, bool keepSpeed, double? speed)
     {
         string? name = AppRule.NormalizeFileName(pathOrName);
         if (name is null || !IsValidRule(action, speed) || KnownBrowsers.Find(name) is not null)
@@ -132,7 +156,7 @@ public sealed class RulesViewModel
         return true;
     }
 
-    private bool AddSite(string urlOrDomain, RuleAction action, bool keepSpeed, double? speed)
+    private bool AddOrSetSite(string urlOrDomain, RuleAction action, bool keepSpeed, double? speed)
     {
         string? domain = Domains.Normalize(urlOrDomain);
         if (domain is null || !IsValidRule(action, speed))
@@ -206,8 +230,7 @@ public sealed class RulesViewModel
             return;
         }
 
-        // Replace the row without a second save; the caller saves once.
-        int index = items.IndexOf(existing);
-        items[index] = new RuleItem(existing.Name, action, keepSpeed ? existing.Speed : speed, Changed);
+        // Update the row in place (keeping anything half-typed in its speed box); the caller saves once.
+        existing.Update(action, keepSpeed, speed);
     }
 }

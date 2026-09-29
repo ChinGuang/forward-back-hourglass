@@ -22,13 +22,28 @@ public partial class ClassifyPromptWindow : Window
         InitializeComponent();
         _choose = choose;
         DomainRun.Text = domain;
-        SpeedBox.ItemsSource = RuleItem.SpeedChoices;
         _hideTimer = new DispatcherTimer { Interval = ShowFor };
         _hideTimer.Tick += (_, _) => Close();
         Loaded += (_, _) => PlaceInCorner();
         Closed += (_, _) => _hideTimer.Stop();
+
+        // Don't vanish while you're choosing: the countdown to auto-hide waits while the mouse is over the popup
+        // or its speed list is open, and starts over when you move away.
+        MouseEnter += (_, _) => _hideTimer.Stop();
+        MouseLeave += (_, _) => RestartHideTimerIfIdle();
         _hideTimer.Start();
     }
+
+    private void RestartHideTimerIfIdle()
+    {
+        if (!IsMouseOver && !SpeedBox.IsDropDownOpen)
+        {
+            _hideTimer.Stop();
+            _hideTimer.Start();
+        }
+    }
+
+    private void OnSpeedDropDownClosed(object? sender, EventArgs e) => RestartHideTimerIfIdle();
 
     protected override void OnSourceInitialized(EventArgs e)
     {

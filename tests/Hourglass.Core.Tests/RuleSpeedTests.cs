@@ -19,6 +19,10 @@ public class RuleSpeedTests
     [InlineData("12.75", 12.75)]
     [InlineData("0.001", 0.001)]
     [InlineData("1000000", 1000000.0)]
+    [InlineData("0,5", 0.5)]
+    [InlineData("0,250", 0.25)]      // leading zero: clearly a decimal comma
+    [InlineData("1E+20", 1e20)]      // how extreme speeds are shown, so they read back
+    [InlineData("2.5e-7x", 2.5e-7)]
     public void TryParseRuleSpeed_AcceptsPositiveNumbers(string text, double expected)
     {
         Assert.True(SpeedPresets.TryParseRuleSpeed(text, out double? speed));
@@ -45,7 +49,11 @@ public class RuleSpeedTests
     [InlineData("2 3")]
     [InlineData("NaN")]
     [InlineData("Infinity")]
-    [InlineData("1e400")]
+    [InlineData("1e400")]            // overflows to infinity
+    [InlineData("1,000")]            // thousands separator or decimal comma? ambiguous, so refused
+    [InlineData("12,500")]
+    [InlineData("1.000,5")]
+    [InlineData("1,2,3")]
     public void TryParseRuleSpeed_RejectsZeroNegativeAndText(string text)
     {
         Assert.False(SpeedPresets.TryParseRuleSpeed(text, out _));
@@ -55,6 +63,8 @@ public class RuleSpeedTests
     [InlineData(1.5, "1.5×")]
     [InlineData(12.75, "12.75×")]
     [InlineData(0.25, "0.25×")]
+    [InlineData(1000000, "1000000×")]
+    [InlineData(1.2345678, "1.2345678×")]
     public void Label_ShowsTypedSpeeds(double speed, string expected)
     {
         Assert.Equal(expected, SpeedPresets.Label(speed));
@@ -113,6 +123,47 @@ public class RuleSpeedTests
 
         Assert.Equal(TimeSpan.Zero, timer.Value);
         Assert.True(timer.IsRinging);
+    }
+
+    [Theory]
+    [InlineData(1.5)]
+    [InlineData(1000000)]
+    [InlineData(1.2345678)]
+    [InlineData(1e20)]
+    [InlineData(1e-9)]
+    public void Label_ReadsBackToTheSameSpeed(double speed)
+    {
+        Assert.True(SpeedPresets.TryParseRuleSpeed(SpeedPresets.Label(speed), out double? parsed));
+        Assert.Equal(speed, parsed);
+    }
+
+    [Fact]
+    public void Timer_TinySpeed_AddsUpAcrossFrames_InsteadOfRoundingToZero()
+    {
+        var timer = new HourglassTimer { SpeedOverride = 1e-6 };
+        timer.Start();
+
+        // 33 ms frames: 0.33 ticks each at 1e-6×, which used to round down to nothing every frame.
+        for (int frame = 0; frame < 100_000; frame++)
+        {
+            timer.Advance(TimeSpan.FromMilliseconds(33));
+        }
+
+        Assert.InRange(timer.Value.Ticks, 32_999, 33_000);
+    }
+
+    [Fact]
+    public void Timer_SmallSpeed_IsAccuratePerFrame()
+    {
+        var timer = new HourglassTimer { SpeedOverride = 1e-5 };
+        timer.Start();
+
+        for (int frame = 0; frame < 1_000; frame++)
+        {
+            timer.Advance(TimeSpan.FromMilliseconds(33));   // 3.3 ticks per frame
+        }
+
+        Assert.InRange(timer.Value.Ticks, 3_299, 3_300);
     }
 
     [Fact]
@@ -242,7 +293,7 @@ public class RuleSpeedTests
     {
         var store = new FakeSettingsStore();
         var rules = new MainViewModel(_ticker, _alarm, store).Rules;
-        rules.AddSite("youtube.com", RuleAction.Backward, 4);
+        rules.SetSite("youtube.com", RuleAction.Backward, 4);
         RuleItem site = rules.Sites[0];
         int saves = store.SaveCount;
 
@@ -264,7 +315,7 @@ public class RuleSpeedTests
     public void RuleItem_ShowsItsSpeed_AndDisablesSpeedForPause()
     {
         var rules = new MainViewModel(_ticker, _alarm, new FakeSettingsStore()).Rules;
-        rules.AddApp("Code.exe", RuleAction.Forward, 1.5);
+        rules.SetApp("Code.exe", RuleAction.Forward, 1.5);
         RuleItem app = rules.Apps[0];
 
         Assert.Equal("1.5×", app.SpeedText);
@@ -275,15 +326,15 @@ public class RuleSpeedTests
     }
 
     [Fact]
-    public void AddSite_WithoutSpeed_KeepsAnExistingRulesSpeed_WithSpeed_ReplacesIt()
+    public void AddSite_KeepsAnExistingRulesSpeed_SetSite_ReplacesIt()
     {
         var rules = new MainViewModel(_ticker, _alarm, new FakeSettingsStore()).Rules;
-        rules.AddSite("youtube.com", RuleAction.Backward, 4);
+        rules.SetSite("youtube.com", RuleAction.Backward, 4);
 
         rules.AddSite("youtube.com", RuleAction.Forward);
         Assert.Equal((RuleAction.Forward, (double?)4), (rules.Sites[0].Action, rules.Sites[0].Speed));
 
-        rules.AddSite("youtube.com", RuleAction.Backward, null);
+        rules.SetSite("youtube.com", RuleAction.Backward, null);
         Assert.Null(rules.Sites[0].Speed);
     }
 
@@ -295,8 +346,39 @@ public class RuleSpeedTests
     {
         var rules = new MainViewModel(_ticker, _alarm, new FakeSettingsStore()).Rules;
 
-        Assert.False(rules.AddApp("Code.exe", RuleAction.Forward, speed));
-        Assert.False(rules.AddSite("youtube.com", RuleAction.Backward, speed));
+        Assert.False(rules.SetApp("Code.exe", RuleAction.Forward, speed));
+        Assert.False(rules.SetSite("youtube.com", RuleAction.Backward, speed));
+    }
+
+    [Fact]
+    public void AddSite_UpdatesTheRowInPlace_KeepingSpeedTextBeingTyped()
+    {
+        var rules = new MainViewModel(_ticker, _alarm, new FakeSettingsStore()).Rules;
+        rules.SetSite("youtube.com", RuleAction.Backward, 4);
+        RuleItem row = rules.Sites[0];
+        row.SpeedText = "fast";                // still being fixed by the user
+
+        rules.AddSite("youtube.com", RuleAction.Forward);
+
+        Assert.Same(row, rules.Sites[0]);
+        Assert.Equal(RuleAction.Forward, row.Action);
+        Assert.Equal("fast", row.SpeedText);
+        Assert.True(row.HasSpeedError);
+        Assert.Equal(4, row.Speed);
+    }
+
+    [Fact]
+    public void SetSite_OverwritesTheSpeedAndClearsAnError()
+    {
+        var rules = new MainViewModel(_ticker, _alarm, new FakeSettingsStore()).Rules;
+        rules.SetSite("youtube.com", RuleAction.Backward, 4);
+        rules.Sites[0].SpeedText = "fast";
+
+        rules.SetSite("youtube.com", RuleAction.Backward, 2);
+
+        Assert.Equal("2×", rules.Sites[0].SpeedText);
+        Assert.False(rules.Sites[0].HasSpeedError);
+        Assert.Equal(2, rules.Sites[0].Speed);
     }
 
     [Fact]
