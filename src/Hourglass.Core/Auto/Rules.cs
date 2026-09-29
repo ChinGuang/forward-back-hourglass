@@ -34,8 +34,9 @@ public sealed record AppRule(string FileName, RuleAction Action, double? Speed =
         return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : name + ".exe";
     }
 
+    /// <summary>Same program, ignoring case and a missing ".exe" on either side.</summary>
     public bool Matches(string processFileName) =>
-        string.Equals(NormalizeFileName(processFileName), FileName, StringComparison.OrdinalIgnoreCase);
+        string.Equals(NormalizeFileName(processFileName), NormalizeFileName(FileName), StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>A website matched by domain: <c>youtube.com</c> also covers <c>www.youtube.com</c>, <c>m.youtube.com</c>, …</summary>
