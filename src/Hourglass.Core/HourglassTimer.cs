@@ -32,6 +32,10 @@ public sealed class HourglassTimer
 {
     private double _forwardSpeed = SpeedPresets.Default;
     private double _backwardSpeed = SpeedPresets.Default;
+    private double? _speedOverride;
+
+    // Fractions of a tick not yet counted, so very small speeds still add up over many frames.
+    private double _tickRemainder;
 
     /// <summary>The current hourglass time. Never negative.</summary>
     public TimeSpan Value { get; private set; } = TimeSpan.Zero;
@@ -55,6 +59,20 @@ public sealed class HourglassTimer
     public bool CanPause => IsRunning;
 
     public bool CanReset => Value > TimeSpan.Zero || State != TimerState.Idle || IsRinging || LastDirection != TimerDirection.None;
+
+    /// <summary>
+    /// A speed that replaces <see cref="ForwardSpeed"/>/<see cref="BackwardSpeed"/> for whichever direction is
+    /// running (auto mode sets it from the app or website in front); null uses the normal speeds.
+    /// </summary>
+    public double? SpeedOverride
+    {
+        get => _speedOverride;
+        set => _speedOverride = value is { } speed ? ValidateSpeed(speed) : null;
+    }
+
+    /// <summary>The multiplier in effect for the current (or last) direction.</summary>
+    public double CurrentSpeed =>
+        _speedOverride ?? (LastDirection == TimerDirection.Backward ? BackwardSpeed : ForwardSpeed);
 
     /// <summary>Speed multiplier while counting forward (e.g. 2 = two timer seconds per real second).</summary>
     public double ForwardSpeed
@@ -81,6 +99,7 @@ public sealed class HourglassTimer
         IsRinging = false;
         State = TimerState.Forward;
         LastDirection = TimerDirection.Forward;
+        _tickRemainder = 0;
         return true;
     }
 
@@ -102,6 +121,7 @@ public sealed class HourglassTimer
         IsRinging = false;
         State = TimerState.Backward;
         LastDirection = TimerDirection.Backward;
+        _tickRemainder = 0;
         return true;
     }
 
@@ -124,6 +144,7 @@ public sealed class HourglassTimer
         State = TimerState.Idle;
         LastDirection = TimerDirection.None;
         IsRinging = false;
+        _tickRemainder = 0;
     }
 
     public void StopRing() => IsRinging = false;
@@ -162,12 +183,12 @@ public sealed class HourglassTimer
 
         if (State == TimerState.Forward)
         {
-            TimeSpan step = realElapsed * ForwardSpeed;
+            TimeSpan step = Scale(realElapsed, CurrentSpeed, ref _tickRemainder);
             Value = step > TimeSpan.MaxValue - Value ? TimeSpan.MaxValue : Value + step;
             return;
         }
 
-        TimeSpan drain = realElapsed * BackwardSpeed;
+        TimeSpan drain = Scale(realElapsed, CurrentSpeed, ref _tickRemainder);
         if (drain < Value)
         {
             Value -= drain;
@@ -195,9 +216,28 @@ public sealed class HourglassTimer
             _ => s.Value == TimeSpan.Zero && s.LastDirection != TimerDirection.Forward,
         };
 
+    /// <summary>
+    /// elapsed × speed in whole ticks, carrying the fraction to the next call (so 1e-6× still counts, just slowly)
+    /// and saturating at <see cref="TimeSpan.MaxValue"/> instead of overflowing for huge speeds.
+    /// </summary>
+    private static TimeSpan Scale(TimeSpan elapsed, double speed, ref double remainder)
+    {
+        double exact = elapsed.Ticks * speed + remainder;
+        if (exact >= TimeSpan.MaxValue.Ticks)
+        {
+            remainder = 0;
+            return TimeSpan.MaxValue;
+        }
+
+        // Round away float noise (e.g. 2.9999999999 → 3) before splitting off the fraction.
+        double whole = Math.Floor(exact + 1e-6);
+        remainder = Math.Max(exact - whole, 0);
+        return TimeSpan.FromTicks((long)whole);
+    }
+
     private static double ValidateSpeed(double speed)
     {
-        if (!double.IsFinite(speed) || speed <= 0)
+        if (!SpeedPresets.IsValid(speed))
         {
             throw new ArgumentOutOfRangeException(nameof(speed), speed, "Speed must be a positive, finite number.");
         }

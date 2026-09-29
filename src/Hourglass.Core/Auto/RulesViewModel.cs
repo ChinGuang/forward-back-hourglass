@@ -8,15 +8,24 @@ public sealed class RuleItem : INotifyPropertyChanged
 {
     private readonly Action _changed;
     private RuleAction _action;
+    private double? _speed;
+    private string _speedText;
+    private bool _hasSpeedError;
 
-    internal RuleItem(string name, RuleAction action, Action changed)
+    internal RuleItem(string name, RuleAction action, double? speed, Action changed)
     {
         Name = name;
         _action = action;
+        _speed = speed;
+        _speedText = SpeedPresets.Label(speed);
         _changed = changed;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>"Default" plus the preset multipliers, for the speed box (any positive number can also be typed).</summary>
+    public static IReadOnlyList<string> SpeedChoices { get; } =
+        [SpeedPresets.DefaultLabel, .. SpeedPresets.All.Select(SpeedPresets.Label)];
 
     public string Name { get; }
 
@@ -31,10 +40,71 @@ public sealed class RuleItem : INotifyPropertyChanged
             }
 
             _action = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Action)));
+            Raise(nameof(Action));
+            Raise(nameof(IsSpeedEnabled));
             _changed();
         }
     }
+
+    /// <summary>This rule's own multiplier; null uses the main Forward/Backward speed.</summary>
+    public double? Speed => _speed;
+
+    /// <summary>A Pause rule doesn't count, so its speed doesn't matter.</summary>
+    public bool IsSpeedEnabled => _action != RuleAction.Pause;
+
+    /// <summary>
+    /// The speed box's text. Valid input ("Default", "2×", "1.5", "0,25x") is applied and saved at once; anything
+    /// else leaves the current speed unchanged and sets <see cref="HasSpeedError"/>.
+    /// </summary>
+    public string SpeedText
+    {
+        get => _speedText;
+        set
+        {
+            _speedText = value ?? "";
+            bool valid = SpeedPresets.TryParseRuleSpeed(_speedText, out double? speed);
+            if (_hasSpeedError == valid)
+            {
+                _hasSpeedError = !valid;
+                Raise(nameof(HasSpeedError));
+            }
+
+            if (valid && speed != _speed)
+            {
+                _speed = speed;
+                Raise(nameof(Speed));
+                _changed();
+            }
+        }
+    }
+
+    public bool HasSpeedError => _hasSpeedError;
+
+    /// <summary>
+    /// Changes the rule in place (the caller saves). With <paramref name="keepSpeed"/> the speed and any text still
+    /// being typed in the speed box are left alone.
+    /// </summary>
+    internal void Update(RuleAction action, bool keepSpeed, double? speed)
+    {
+        if (_action != action)
+        {
+            _action = action;
+            Raise(nameof(Action));
+            Raise(nameof(IsSpeedEnabled));
+        }
+
+        if (!keepSpeed)
+        {
+            _speed = speed;
+            _speedText = SpeedPresets.Label(speed);
+            _hasSpeedError = false;
+            Raise(nameof(Speed));
+            Raise(nameof(SpeedText));
+            Raise(nameof(HasSpeedError));
+        }
+    }
+
+    private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
 /// <summary>The tracked apps and websites, editable from the UI. Every change is saved and applied at once.</summary>
@@ -59,32 +129,42 @@ public sealed class RulesViewModel
     public ObservableCollection<string> Unclassified { get; } = [];
 
     /// <summary>
-    /// Adds an app from a path or file name, or updates its action if it's already listed. Supported browsers are
-    /// refused: inside them the website decides, so an app rule would never apply.
+    /// Adds an app from a path or file name, or updates its action if it's already listed (keeping its speed).
+    /// Supported browsers are refused: inside them the website decides, so an app rule would never apply.
     /// </summary>
-    public bool AddApp(string pathOrName, RuleAction action)
+    public bool AddApp(string pathOrName, RuleAction action) => AddOrSetApp(pathOrName, action, keepSpeed: true, speed: null);
+
+    /// <summary>Adds or replaces an app rule with exactly this action and speed (null speed = the main speed).</summary>
+    public bool SetApp(string pathOrName, RuleAction action, double? speed) => AddOrSetApp(pathOrName, action, keepSpeed: false, speed);
+
+    /// <summary>Adds a website rule (any URL or domain the user typed), or updates its action if it exists (keeping its speed).</summary>
+    public bool AddSite(string urlOrDomain, RuleAction action) => AddOrSetSite(urlOrDomain, action, keepSpeed: true, speed: null);
+
+    /// <summary>Adds or replaces a website rule with exactly this action and speed (null speed = the main speed).</summary>
+    public bool SetSite(string urlOrDomain, RuleAction action, double? speed) => AddOrSetSite(urlOrDomain, action, keepSpeed: false, speed);
+
+    private bool AddOrSetApp(string pathOrName, RuleAction action, bool keepSpeed, double? speed)
     {
         string? name = AppRule.NormalizeFileName(pathOrName);
-        if (name is null || !Enum.IsDefined(action) || KnownBrowsers.Find(name) is not null)
+        if (name is null || !IsValidRule(action, speed) || KnownBrowsers.Find(name) is not null)
         {
             return false;
         }
 
-        Upsert(Apps, name, action, StringComparer.OrdinalIgnoreCase);
+        Upsert(Apps, name, action, keepSpeed, speed, StringComparer.OrdinalIgnoreCase);
         Changed();
         return true;
     }
 
-    /// <summary>Adds a website rule (any URL or domain the user typed), or updates it if it exists.</summary>
-    public bool AddSite(string urlOrDomain, RuleAction action)
+    private bool AddOrSetSite(string urlOrDomain, RuleAction action, bool keepSpeed, double? speed)
     {
         string? domain = Domains.Normalize(urlOrDomain);
-        if (domain is null || !Enum.IsDefined(action))
+        if (domain is null || !IsValidRule(action, speed))
         {
             return false;
         }
 
-        Upsert(Sites, domain, action, StringComparer.Ordinal);
+        Upsert(Sites, domain, action, keepSpeed, speed, StringComparer.Ordinal);
         foreach (string seen in Unclassified.Where(seen => Domains.IsSameOrSubdomain(seen, domain)).ToList())
         {
             Unclassified.Remove(seen);
@@ -104,8 +184,8 @@ public sealed class RulesViewModel
 
     /// <summary>The rules as a snapshot; rebuilt only after an edit, since auto mode reads it on every window change.</summary>
     public AutoRules ToRules() => _current ??= new AutoRules(
-        Apps.Select(item => new AppRule(item.Name, item.Action)).ToArray(),
-        Sites.Select(item => new SiteRule(item.Name, item.Action)).ToArray());
+        Apps.Select(item => new AppRule(item.Name, item.Action, item.Speed)).ToArray(),
+        Sites.Select(item => new SiteRule(item.Name, item.Action, item.Speed)).ToArray());
 
     internal void Load(AutoRules rules)
     {
@@ -114,12 +194,12 @@ public sealed class RulesViewModel
         Sites.Clear();
         foreach (AppRule app in rules.Apps)
         {
-            Apps.Add(new RuleItem(app.FileName, app.Action, Changed));
+            Apps.Add(new RuleItem(app.FileName, app.Action, app.Speed, Changed));
         }
 
         foreach (SiteRule site in rules.Sites)
         {
-            Sites.Add(new RuleItem(site.Domain, site.Action, Changed));
+            Sites.Add(new RuleItem(site.Domain, site.Action, site.Speed, Changed));
         }
     }
 
@@ -137,17 +217,20 @@ public sealed class RulesViewModel
         _changed();
     }
 
-    private void Upsert(ObservableCollection<RuleItem> items, string name, RuleAction action, StringComparer comparer)
+    private static bool IsValidRule(RuleAction action, double? speed) =>
+        Enum.IsDefined(action) && (speed is null || SpeedPresets.IsValid(speed.Value));
+
+    private void Upsert(
+        ObservableCollection<RuleItem> items, string name, RuleAction action, bool keepSpeed, double? speed, StringComparer comparer)
     {
         RuleItem? existing = items.FirstOrDefault(item => comparer.Equals(item.Name, name));
         if (existing is null)
         {
-            items.Add(new RuleItem(name, action, Changed));
+            items.Add(new RuleItem(name, action, speed, Changed));
             return;
         }
 
-        // Update without a second save; the caller saves once.
-        int index = items.IndexOf(existing);
-        items[index] = new RuleItem(existing.Name, action, Changed);
+        // Update the row in place (keeping anything half-typed in its speed box); the caller saves once.
+        existing.Update(action, keepSpeed, speed);
     }
 }

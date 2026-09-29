@@ -1,5 +1,8 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using Hourglass.Core;
 using Microsoft.Win32;
 
@@ -16,6 +19,41 @@ public partial class AppsWindow : Window
         _rules = rules;
         DataContext = rules;
     }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        // A speed still being typed counts: apply it before the window goes.
+        if (Keyboard.FocusedElement is DependencyObject focused && FindComboBox(focused) is { } box)
+        {
+            CommitSpeed(box);
+        }
+
+        base.OnClosing(e);
+    }
+
+    private static ComboBox? FindComboBox(DependencyObject? element)
+    {
+        while (element is not null and not ComboBox)
+        {
+            element = VisualTreeHelper.GetParent(element) ?? LogicalTreeHelper.GetParent(element);
+        }
+
+        return element as ComboBox;
+    }
+
+    private static void CommitSpeed(ComboBox box) =>
+        box.GetBindingExpression(ComboBox.TextProperty)?.UpdateSource();
+
+    private void OnSpeedKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            CommitSpeed((ComboBox)sender);
+            e.Handled = true;
+        }
+    }
+
+    private void OnSpeedPicked(object? sender, EventArgs e) => CommitSpeed((ComboBox)sender!);
 
     private void OnRemove(object sender, RoutedEventArgs e)
     {

@@ -33,12 +33,13 @@ Turn on **Auto: follow apps & sites** and the timer is driven by whatever is in 
 - **Apps & sites…** keeps your rules. Each app or website is set to **Forward**, **Backward** or **Pause**, e.g. `Code.exe` → Forward (earn time) and `youtube.com` → Backward (spend it).
   - **Apps:** pick one from the apps currently open, or browse for any `.exe`. Apps are matched by program file name, so they keep matching after an update moves the install folder.
   - **Websites:** type a domain or paste a page address. `youtube.com` also covers `www.youtube.com`, `m.youtube.com` and every page on YouTube. A more specific rule wins, so `music.youtube.com` beats `youtube.com`.
+- **Speed per app or website:** each rule has a **Speed** box. **Default** uses the main Forward/Backward speed. You can pick a preset (0.25×–8×) or type any positive number, decimals included, such as `1.5`, `3` or `0.1`. For example, `Code.exe` could be Forward at 2× and `youtube.com` Backward at 4×. Unclassified websites use the main Backward speed, and Pause rules ignore speed. The status line shows the speed in use, e.g. "Auto · youtube.com: counting backward (4×)".
 - **What the timer does:**
   - An app or website with a rule: the timer follows it.
   - Anything else, including the hourglass window itself: the timer pauses.
   - A countdown you come back to resumes where it was, rather than refilling the glass.
 - **Browsers:** in **Brave, Opera and Vivaldi** the website in the active tab decides. **Chrome and Edge** use the same engine and should work, but are untested.
-  - **A site without a rule** counts **backward**. The first time you visit one, a small popup in the bottom-right corner asks whether it should count Forward, Pause or Backward. The popup never takes focus, so your video and typing aren't interrupted. Sites you haven't classified are also listed in **Apps & sites…** so you can classify them later.
+  - **A site without a rule** counts **backward**. The first time you visit one, a small popup in the bottom-right corner asks whether it should count Forward, Pause or Backward. The popup never takes focus, so your video and typing aren't interrupted. It also has a speed dropdown (Default or a preset). Because it can't take keyboard focus, it can't accept a typed speed; set custom speeds in **Apps & sites…**. Sites you haven't classified are also listed in **Apps & sites…** so you can classify them later.
   - **Browser pages** such as a new tab, settings or local files pause the timer and never prompt.
   - **When the address can't be read**, for example a full-screen video or F11, the timer keeps following the last site read from that window.
 - **When a countdown reaches zero** in auto mode, the ring plays and the hourglass window jumps to the front until you stop it. Games running in *exclusive* full-screen can't be covered by any window, but you'll still hear the ring.

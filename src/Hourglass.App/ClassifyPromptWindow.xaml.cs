@@ -14,10 +14,10 @@ public partial class ClassifyPromptWindow : Window
 {
     private static readonly TimeSpan ShowFor = TimeSpan.FromSeconds(20);
 
-    private readonly Action<RuleAction> _choose;
+    private readonly Action<RuleAction, double?> _choose;
     private readonly DispatcherTimer _hideTimer;
 
-    public ClassifyPromptWindow(string domain, Action<RuleAction> choose)
+    public ClassifyPromptWindow(string domain, Action<RuleAction, double?> choose)
     {
         InitializeComponent();
         _choose = choose;
@@ -26,8 +26,24 @@ public partial class ClassifyPromptWindow : Window
         _hideTimer.Tick += (_, _) => Close();
         Loaded += (_, _) => PlaceInCorner();
         Closed += (_, _) => _hideTimer.Stop();
+
+        // Don't vanish while you're choosing: the countdown to auto-hide waits while the mouse is over the popup
+        // or its speed list is open, and starts over when you move away.
+        MouseEnter += (_, _) => _hideTimer.Stop();
+        MouseLeave += (_, _) => RestartHideTimerIfIdle();
         _hideTimer.Start();
     }
+
+    private void RestartHideTimerIfIdle()
+    {
+        if (!IsMouseOver && !SpeedBox.IsDropDownOpen)
+        {
+            _hideTimer.Stop();
+            _hideTimer.Start();
+        }
+    }
+
+    private void OnSpeedDropDownClosed(object? sender, EventArgs e) => RestartHideTimerIfIdle();
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -44,9 +60,10 @@ public partial class ClassifyPromptWindow : Window
 
     private void OnChoose(object sender, RoutedEventArgs e)
     {
-        if (Enum.TryParse(((Button)sender).Tag as string, out RuleAction action))
+        if (Enum.TryParse(((Button)sender).Tag as string, out RuleAction action)
+            && SpeedPresets.TryParseRuleSpeed(SpeedBox.SelectedItem as string, out double? speed))
         {
-            _choose(action);
+            _choose(action, speed);
         }
 
         Close();

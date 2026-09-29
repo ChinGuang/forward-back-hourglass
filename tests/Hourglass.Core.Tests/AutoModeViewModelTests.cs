@@ -62,7 +62,7 @@ public class AutoModeViewModelTests
         _ticker.Elapse(10);
 
         Assert.Equal("00:00:10.0", vm.DisplayTime);
-        Assert.Equal("Auto · Code.exe: counting forward", vm.AutoStatusText);
+        Assert.Equal("Auto · Code.exe: counting forward (1×)", vm.AutoStatusText);
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class AutoModeViewModelTests
         _ticker.Elapse(1);
 
         Assert.Equal("00:00:09.0", vm.DisplayTime);
-        Assert.Equal("Auto · youtube.com: counting backward", vm.AutoStatusText);
+        Assert.Equal("Auto · youtube.com: counting backward (1×)", vm.AutoStatusText);
 
         _watcher.ShowBrowser("news.com/today");
         Assert.Equal(TimerState.Paused, vm.State);
@@ -231,7 +231,7 @@ public class AutoModeViewModelTests
         Assert.Equal("00:00:08.0", vm.DisplayTime);
         Assert.Equal(["reddit.com"], asked);
         Assert.Equal(["reddit.com"], vm.Rules.Unclassified);
-        Assert.Equal("Auto · reddit.com (not classified yet): counting backward", vm.AutoStatusText);
+        Assert.Equal("Auto · reddit.com (not classified yet): counting backward (1×)", vm.AutoStatusText);
     }
 
     [Fact]

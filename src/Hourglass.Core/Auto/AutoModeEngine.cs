@@ -25,7 +25,13 @@ public enum AutoReason
 /// <summary>What auto mode wants the timer to do, and why.</summary>
 /// <param name="Subject">The app, domain or browser the decision is about (for the status line).</param>
 /// <param name="PromptDomain">Set once per session for a newly seen unclassified site: ask the user about it.</param>
-public readonly record struct AutoDecision(RuleAction Action, AutoReason Reason, string? Subject = null, string? PromptDomain = null);
+/// <param name="Speed">The matching rule's own multiplier; null uses the main Forward/Backward speed.</param>
+public readonly record struct AutoDecision(
+    RuleAction Action,
+    AutoReason Reason,
+    string? Subject = null,
+    string? PromptDomain = null,
+    double? Speed = null);
 
 /// <summary>Turns "which window is in front" into a timer action using the user's rules.</summary>
 public sealed class AutoModeEngine
@@ -48,7 +54,7 @@ public sealed class AutoModeEngine
         }
 
         return rules.FindApp(window.ProcessFileName) is { } app
-            ? new AutoDecision(app.Action, AutoReason.AppRule, app.FileName)
+            ? new AutoDecision(app.Action, AutoReason.AppRule, app.FileName, Speed: app.Speed)
             : new AutoDecision(RuleAction.Pause, AutoReason.UntrackedApp, AppRule.NormalizeFileName(window.ProcessFileName));
     }
 
@@ -75,7 +81,7 @@ public sealed class AutoModeEngine
 
         if (rules.FindSite(url.Host) is { } site)
         {
-            return new AutoDecision(site.Action, AutoReason.SiteRule, site.Domain);
+            return new AutoDecision(site.Action, AutoReason.SiteRule, site.Domain, Speed: site.Speed);
         }
 
         string suggested = Domains.Suggest(url.Host);

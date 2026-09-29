@@ -195,8 +195,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         else
         {
-            // Leave the timer where auto mode left it (normally paused); the buttons take over.
+            // Leave the timer where auto mode left it (normally paused); the buttons take over, at the main speeds.
             _watcher?.Stop();
+            FlushTicker();
+            _timer.SpeedOverride = null;
             _activeWindow = null;
             _lastDecision = default;
             Sync();
@@ -217,7 +219,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         AutoDecision decision = _engine.Decide(_activeWindow, Rules.ToRules());
         _lastDecision = decision;
+
+        // Count the time so far at the old speed, then switch to this rule's own speed (null = main speed).
         FlushTicker();
+        _timer.SpeedOverride = decision.Action == RuleAction.Pause ? null : decision.Speed;
         switch (decision.Action)
         {
             case RuleAction.Forward:
@@ -389,11 +394,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         AutoDecision d = _lastDecision;
+        string speed = SpeedPresets.Label(_timer.CurrentSpeed);
         string doing = d.Action switch
         {
-            RuleAction.Forward => "counting forward",
+            RuleAction.Forward => $"counting forward ({speed})",
             RuleAction.Backward when _timer.Value == TimeSpan.Zero && !_timer.IsRunning => "nothing left to count down",
-            RuleAction.Backward => "counting backward",
+            RuleAction.Backward => $"counting backward ({speed})",
             _ => "paused",
         };
 

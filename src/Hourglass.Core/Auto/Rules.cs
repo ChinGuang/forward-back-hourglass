@@ -9,7 +9,8 @@ public enum RuleAction
 }
 
 /// <summary>An app matched by its program file name (e.g. <c>Code.exe</c>), case-insensitively.</summary>
-public sealed record AppRule(string FileName, RuleAction Action)
+/// <param name="Speed">Its own multiplier; null uses the main Forward/Backward speed.</param>
+public sealed record AppRule(string FileName, RuleAction Action, double? Speed = null)
 {
     /// <summary>
     /// Turns a path or name into the stored form: <c>C:\Apps\Code.exe</c>, <c>Code.exe</c> and <c>Code</c> all
@@ -38,7 +39,8 @@ public sealed record AppRule(string FileName, RuleAction Action)
 }
 
 /// <summary>A website matched by domain: <c>youtube.com</c> also covers <c>www.youtube.com</c>, <c>m.youtube.com</c>, …</summary>
-public sealed record SiteRule(string Domain, RuleAction Action)
+/// <param name="Speed">Its own multiplier; null uses the main Forward/Backward speed.</param>
+public sealed record SiteRule(string Domain, RuleAction Action, double? Speed = null)
 {
     public bool Matches(string host) => Domains.IsSameOrSubdomain(host, Domain);
 }
@@ -70,7 +72,7 @@ public sealed record AutoRules(IReadOnlyList<AppRule> Apps, IReadOnlyList<SiteRu
             }
 
             apps.RemoveAll(existing => string.Equals(existing.FileName, name, StringComparison.OrdinalIgnoreCase));
-            apps.Add(new AppRule(name, rule.Action));
+            apps.Add(new AppRule(name, rule.Action, ValidSpeedOrDefault(rule.Speed)));
         }
 
         var sites = new List<SiteRule>();
@@ -83,11 +85,15 @@ public sealed record AutoRules(IReadOnlyList<AppRule> Apps, IReadOnlyList<SiteRu
             }
 
             sites.RemoveAll(existing => existing.Domain == domain);
-            sites.Add(new SiteRule(domain, rule.Action));
+            sites.Add(new SiteRule(domain, rule.Action, ValidSpeedOrDefault(rule.Speed)));
         }
 
         return new AutoRules(apps, sites);
     }
+
+    /// <summary>A hand-edited speed of 0, a negative number or infinity falls back to the main speed.</summary>
+    private static double? ValidSpeedOrDefault(double? speed) =>
+        speed is { } value && SpeedPresets.IsValid(value) ? value : null;
 
     public bool Equals(AutoRules? other) =>
         other is not null && Apps.SequenceEqual(other.Apps) && Sites.SequenceEqual(other.Sites);

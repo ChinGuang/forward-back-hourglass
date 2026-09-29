@@ -77,7 +77,7 @@ public partial class MainWindow : Window
     private void OnClassifyRequested(object? sender, string domain)
     {
         _prompt?.Close();
-        _prompt = new ClassifyPromptWindow(domain, action => _viewModel.Rules.AddSite(domain, action));
+        _prompt = new ClassifyPromptWindow(domain, (action, speed) => _viewModel.Rules.SetSite(domain, action, speed));
         _prompt.Closed += (_, _) => _prompt = null;
         _prompt.Show();
     }
